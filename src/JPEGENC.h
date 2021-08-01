@@ -51,6 +51,7 @@
 #define DCTSIZE 64
 
 #if (INTPTR_MAX == INT64_MAX)
+#define REGISTER_WIDTH 64
 #define BIGINT int64_t
 #define BIGUINT uint64_t
 // structure for outputting variable length codes
@@ -68,11 +69,11 @@ uint64_t ulAcc; // code accumulator (holds codes until at least 64-bits ready to
         {*(uint64_t *)pOut = __builtin_bswap64(ul2); pOut += 8; \
      iLen -= 64; ulAcc = 0;} else \
         {while (iLen >= 8) \
-                        {unsigned char c = (unsigned char)(ulAcc >> 56); *pOut++ = c; \
-        if (c == 0xff) { *pOut++ = 0;} ulAcc <<= 8; iLen -= 8; }} \
-         iLen += iNewLen; ulAcc |= (ulCode << (64 - iLen));} \
-                else { iLen += iNewLen; ulAcc |= (ulCode << (64-iLen)); }
+            {unsigned char c = (unsigned char)(ulAcc >> 56); *pOut++ = c; \
+            if (c == 0xff) { *pOut++ = 0;} ulAcc <<= 8; iLen -= 8; }}} \
+        iLen += iNewLen; ulAcc |= (ulCode << (64-iLen));
 #else
+#define REGISTER_WIDTH 32
 #define BIGINT int32_t
 #define BIGUINT uint32_t
 // structure for outputting variable length codes
@@ -82,6 +83,7 @@ unsigned char *pOut; // current output pointer
 int32_t iLen;  // length of data in accumulator
 uint32_t ulAcc; // code accumulator (holds codes until at least 32-bits ready to write
 } PIL_CODE;
+// 32-bit output stage assumes that unaligned writes are not allowed
 #define STORECODE(pOut, iLen, ulCode, ulAcc, iNewLen) \
         if (iLen+iNewLen > 32) { while (iLen >= 8) \
                         {unsigned char c = (unsigned char)(ulAcc >> 24); *pOut++ = c; \
@@ -162,7 +164,7 @@ typedef struct jpeg_image_tag
     int *huffdc[4]; // DEBUG - placeholder
     signed short sQuantTable[DCTSIZE*2];
     signed short MCUs[6*DCTSIZE];
-    uint8_t ucHuffACDCBuf[16]; // DEBUG
+    uint8_t ucHuffACDCBuf[2048*sizeof(int)]; // DEBUG
     JPEG_READ_CALLBACK *pfnRead;
     JPEG_WRITE_CALLBACK *pfnWrite;
     JPEG_SEEK_CALLBACK *pfnSeek;
@@ -193,7 +195,7 @@ class JPEG
     int addMCU(JPEGENCODE *pEncode, uint8_t *pPixels, int iPitch);
     int getLastError();
 
-  private:
+//  private:
     JPEGIMAGE _jpeg;
 };
 #else
@@ -211,8 +213,5 @@ int JPEGGetLastError(JPEGIMAGE *pJPEG);
 #define INTELLONG(p) ((*p) + (*(p+1)<<8) + (*(p+2)<<16) + (*(p+3)<<24))
 #define MOTOSHORT(p) (((*(p))<<8) + (*(p+1)))
 #define MOTOLONG(p) (((*p)<<24) + ((*(p+1))<<16) + ((*(p+2))<<8) + (*(p+3)))
-
-// Must be a 32-bit target processor
-#define REGISTER_WIDTH 32
 
 #endif // __JPEGENC__

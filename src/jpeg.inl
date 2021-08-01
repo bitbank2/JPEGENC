@@ -502,6 +502,14 @@ void JPEGMakeHuffE(JPEGIMAGE *pJPEG)
             cc <<= 1;
         }
     }
+    // write it to a file
+//    {
+//        FILE *ohandle = fopen("/Users/laurencebank/Downloads/hufftable.bin", "w+b");
+//        if (ohandle) {
+//            fwrite(pJPEG->ucHuffACDCBuf, 1, 8192, ohandle);
+//            fclose(ohandle);
+//        }
+//    }
 } /* JPEGMakeHuffE() */
 //
 // Finish the file
@@ -547,11 +555,10 @@ int JPEGEncodeBegin(JPEGIMAGE *pJPEG, JPEGENCODE *pEncode, int iWidth, int iHeig
     // Set up the output buffer
     pJPEG->pc.iLen = pJPEG->pc.ulAcc = 0;
     if (pJPEG->pOutput) {
-        pJPEG->pc.pOut = pJPEG->pOutput;
+        pBuf = pJPEG->pOutput;
     } else {
-        pJPEG->pc.pOut = pJPEG->ucFileBuf;
+        pBuf = pJPEG->ucFileBuf;
     }
-    pBuf = pJPEG->pc.pOut;
     // Write the JPEG header
     if (pJPEG->ucPixelType == JPEG_PIXEL_GRAYSCALE)
         pJPEG->ucNumComponents = 1;
@@ -745,6 +752,8 @@ int JPEGEncodeBegin(JPEGIMAGE *pJPEG, JPEGENCODE *pEncode, int iWidth, int iHeig
     pBuf[iOffset++] = 0; // start of spectral selection
     pBuf[iOffset++] = 63; // end of spectral selection
     pBuf[iOffset++] = 0; // successive approximation bit
+    // Set the output pointer for writing the variable length codes
+    pJPEG->pc.pOut = &pBuf[iOffset];
     
     // prepare the luma & chroma quantization tables
     for (i = 0; i<64; i++)
@@ -781,74 +790,18 @@ int JPEGEncodeBegin(JPEGIMAGE *pJPEG, JPEGENCODE *pEncode, int iWidth, int iHeig
 
 int JPEGQuantize(JPEGIMAGE *pJPEG, signed short *pMCUSrc, int iTable)
 {
-#ifdef _X86
-    __m128i xmmIn, xmmQuant, xmmQuant2, xmmMask, xmmTemp, xmmZero, xmmSparse, xmmSparseMask;
-    __m128i preIn, preQuant, preQuant2; // preloaded values
-#else // _X86
-    signed int d, sQ1, sQ2;
-    int bSparse = FALSE; // determine if it results in a sparse matrix and flag it for faster encoding
-#endif
+    signed int d, sQ1, sQ2, sum;
     int i;
     signed short *pQuant;
-    //unsigned char *pZigZag = cZigZag;
-    
-    // The idea behind the sparse mask is to determine if the lower right corner of the
-    // MCU block is filled with zeros. This will allow quicker encoding since the last 36
-    // zeros don't have to be scanned.
-    //
-    // *******z
-    // ******zz
-    // *****zzz
-    // ****zzzz
-    // ***zzzzz
-    // **zzzzzz
-    // *zzzzzzz
-    // zzzzzzzz
     
     pQuant = (signed short *)&pJPEG->sQuantTable[iTable * 64];
-#ifdef _X86
-    xmmZero = _mm_setzero_si128();
-    xmmSparse = _mm_setzero_si128(); // accumulator to test for sparse matrix
-    xmmSparseMask = _mm_cmpeq_epi16(xmmZero, xmmZero); // all FF's
-    // Preload to unroll the loop 1x
-    preIn = _mm_loadu_si128((__m128i *)pMCUSrc);
-    preQuant = _mm_loadu_si128((__m128i *)&pQuant[256]);
-    preQuant2 = _mm_loadu_si128((__m128i*)&pQuant[0]);
-    for (i = 0; i < 8; i++) // do 8 rows of 8 values
-    {
-        xmmIn = preIn; // use the pre-loaded values
-        xmmQuant = preQuant;
-        xmmQuant2 = preQuant2;
-        preQuant = _mm_loadu_si128((__m128i *)&pQuant[256+8]);
-        preQuant2 = _mm_loadu_si128((__m128i*)&pQuant[8]); // get original values for rounding
-        preIn = _mm_loadu_si128((__m128i *)&pMCUSrc[8]);
-        xmmSparseMask = _mm_srli_si128(xmmSparseMask, 2); // open up 2 more bytes of 0000 in top end
-        xmmQuant2 = _mm_srli_epi16(xmmQuant2, 1);
-        xmmMask = _mm_cmplt_epi16(xmmIn, xmmZero); // get a mask for the negative values
-        xmmTemp = _mm_sub_epi16(xmmQuant2, xmmIn); // prepare for negative results
-        xmmIn = _mm_add_epi16(xmmIn, xmmQuant2); // prepare for positive results
-        xmmTemp = _mm_mulhi_epi16(xmmTemp, xmmQuant); // high results of multiple are the scaled values
-        xmmIn = _mm_mulhi_epi16(xmmIn, xmmQuant);
-        xmmTemp = _mm_sub_epi16(xmmZero, xmmTemp); // final result of negative values
-        xmmIn = _mm_andnot_si128(xmmMask, xmmIn); // keep the positive results
-        xmmTemp = _mm_and_si128(xmmTemp, xmmMask); // keep only the negative results we need
-        xmmIn = _mm_or_si128(xmmTemp, xmmIn); // combine negative and positive results
-        xmmTemp = _mm_andnot_si128(xmmSparseMask, xmmIn); // mask off the part we care about
-        xmmSparse = _mm_or_si128(xmmSparse, xmmTemp); // accumulate lower right triangle to see if all 0's
-        _mm_storeu_si128((__m128i*)pMCUSrc, xmmIn); // store the finished values
-        pMCUSrc += 8;
-        pQuant += 8;
-    }
-    xmmSparse = _mm_cmpeq_epi16(xmmSparse, xmmZero); //see if any elements are not zero
-    return (int)(_mm_movemask_epi8(xmmSparse) == 0xffff); // if all elements are 0, we have a sparse matrix
-#endif
-#if !defined(_X86)
-    for (i=0; i<64; i++)
+    for (i=0; i<29; i++) // do first half and then check for second half being all 0's
     {
         sQ1 = pQuant[i];
         sQ2 = sQ1 >> 1;
         d = *pMCUSrc;
-        // avoid doing divides
+        // Avoid doing divides; the second half of the quantization table has 65536/Q values
+        // so that we can use multiplies in this step
         if (d < 0)
         {
             *pMCUSrc++ = 0 - (((sQ2 - d) * pQuant[i + 256]) >> 16);
@@ -858,8 +811,27 @@ int JPEGQuantize(JPEGIMAGE *pJPEG, signed short *pMCUSrc, int iTable)
             *pMCUSrc++ = (((sQ2 + d) * pQuant[i + 256]) >> 16);
         }
     } // for
-    return bSparse;
-#endif // !_X86
+    sum = 0;
+    for (i=29; i<64; i++) // second half; check for 'sparseness'
+    {
+        sQ1 = pQuant[i];
+        sQ2 = sQ1 >> 1;
+        d = *pMCUSrc;
+        // Avoid doing divides; the second half of the quantization table has 65536/Q values
+        // so that we can use multiplies in this step
+        if (d < 0)
+        {
+            d = 0 - (((sQ2 - d) * pQuant[i + 256]) >> 16);
+            sum -= d;
+        }
+        else
+        {
+            d = (((sQ2 + d) * pQuant[i + 256]) >> 16);
+            sum += d;
+        }
+        *pMCUSrc++ = d;
+    } // for
+    return (sum == 0); // if the last half of the quantized results was 0, call it 'sparse'
 } /* JPEGQuantize() */
 
 int JPEGEncodeMCU(int iDCTable, JPEGIMAGE *pJPEG, signed short *pMCUData, int iDCPred, int bSparse)
@@ -953,7 +925,7 @@ int JPEGEncodeMCU(int iDCTable, JPEGIMAGE *pJPEG, signed short *pMCUData, int iD
     }
     
 encodemcuz:
-    pJPEG->pc.ulAcc = ulAcc;
+    pJPEG->pc.ulAcc = ulAcc; // place local copies back in the object pointer version
     pJPEG->pc.pOut = pOut;
     pJPEG->pc.iLen = iLen;
     return iDCPred;
@@ -1497,6 +1469,10 @@ int JPEGAddMCU(JPEGIMAGE *pJPEG, JPEGENCODE *pEncode, uint8_t *pPixels, int iPit
 {
     int bSparse;
     
+    if (pEncode->y >= pJPEG->iHeight) {
+        // the image is already complete or was not initialized properly
+        return JPEG_INVALID_PARAMETER;
+    }
     if (pJPEG->ucPixelType == JPEG_PIXEL_GRAYSCALE) {
         JPEGGetMCU(pPixels, pJPEG, iPitch, pJPEG->MCUs);
         JPEGFDCT(pJPEG->MCUs);
@@ -1511,8 +1487,7 @@ int JPEGAddMCU(JPEGIMAGE *pJPEG, JPEGENCODE *pEncode, uint8_t *pPixels, int iPit
             pJPEG->iDCPred0 = 0; // reset the DC predictor
             pEncode->x = 0;
             pEncode->y += pEncode->cy;
-            if (pEncode->y == pJPEG->iMCUHeight) {
-                FlushCode(&pJPEG->pc);
+            if (pEncode->y >= pJPEG->iHeight) {
                 pJPEG->iDataSize = (int)(pJPEG->pc.pOut - pJPEG->pOutput); // DEBUG
             }
         } else {
