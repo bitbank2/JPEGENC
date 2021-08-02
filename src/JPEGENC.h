@@ -160,10 +160,10 @@ typedef struct jpeg_image_tag
     int iRestart; // current restart counter
     int iDCPred0, iDCPred1, iDCPred2; // DC predictor values for the 3 color components
     PIL_CODE pc;
-    int *huffdc[4]; // DEBUG - placeholder
+    int *huffdc[2];
     signed short sQuantTable[DCTSIZE*4];
     signed short MCUs[6*DCTSIZE];
-    uint8_t ucHuffACDCBuf[2048*sizeof(int)]; // DEBUG
+//    uint8_t ucHuffACDCBuf[4096]; // moved to FLASH
     JPEG_READ_CALLBACK *pfnRead;
     JPEG_WRITE_CALLBACK *pfnWrite;
     JPEG_SEEK_CALLBACK *pfnSeek;
