@@ -427,7 +427,7 @@ void JPEGFixQuantE(JPEGIMAGE *pJPEG)
                 j = 65536 / pus[i];
             else
                 j = 0;
-            pus[i+256] = (unsigned short)j;
+            pus[i+(DCTSIZE*2)] = (unsigned short)j;
         }
     } // for iTable
 } /* JPEGFixQuantE() */
@@ -518,11 +518,20 @@ int JPEGEncodeEnd(JPEGIMAGE *pJPEG)
 {
     if (pJPEG->iError == 0)
     {
-        uint8_t *pBuf = pJPEG->pOutput; // DEBUG - check for non-buffer option
-        int iOutSize = pJPEG->iDataSize;
-        pBuf[iOutSize++] = 0xff;
-        pBuf[iOutSize++] = 0xd9;  // end of image (EOI)
-        pJPEG->iDataSize = iOutSize;
+        if (pJPEG->pOutput == NULL) { // file I/O
+            int iLen;
+            *pJPEG->pc.pOut++ = 0xff; // end of image (EOI)
+            *pJPEG->pc.pOut++ = 0xd9;
+            iLen = (int)(pJPEG->pc.pOut - pJPEG->ucFileBuf);
+            pJPEG->pfnWrite(&pJPEG->JPEGFile, pJPEG->ucFileBuf, iLen);
+            pJPEG->iDataSize += iLen;
+        } else { // user-supplied buffer
+            uint8_t *pBuf = pJPEG->pOutput; // DEBUG - check for non-buffer option
+            int iOutSize = pJPEG->iDataSize;
+            pBuf[iOutSize++] = 0xff;
+            pBuf[iOutSize++] = 0xd9;  // end of image (EOI)
+            pJPEG->iDataSize = iOutSize;
+        }
         return pJPEG->iDataSize; // return the size of the compressed data
     }
     return 0; // something went wrong
@@ -786,7 +795,7 @@ int JPEGEncodeBegin(JPEGIMAGE *pJPEG, JPEGENCODE *pEncode, int iWidth, int iHeig
     JPEGMakeHuffE(pJPEG); // create the Huffman tables to encode
 
     return JPEG_SUCCESS;
-}
+} /* JPEGEncodeBegin() */
 
 int JPEGQuantize(JPEGIMAGE *pJPEG, signed short *pMCUSrc, int iTable)
 {
@@ -794,8 +803,8 @@ int JPEGQuantize(JPEGIMAGE *pJPEG, signed short *pMCUSrc, int iTable)
     int i;
     signed short *pQuant;
     
-    pQuant = (signed short *)&pJPEG->sQuantTable[iTable * 64];
-    for (i=0; i<29; i++) // do first half and then check for second half being all 0's
+    pQuant = (signed short *)&pJPEG->sQuantTable[iTable * DCTSIZE];
+    for (i=0; i<33; i++) // do first half and then check for second half being all 0's
     {
         sQ1 = pQuant[i];
         sQ2 = sQ1 >> 1;
@@ -804,15 +813,15 @@ int JPEGQuantize(JPEGIMAGE *pJPEG, signed short *pMCUSrc, int iTable)
         // so that we can use multiplies in this step
         if (d < 0)
         {
-            *pMCUSrc++ = 0 - (((sQ2 - d) * pQuant[i + 256]) >> 16);
+            *pMCUSrc++ = 0 - (((sQ2 - d) * pQuant[i + 128]) >> 16);
         }
         else
         {
-            *pMCUSrc++ = (((sQ2 + d) * pQuant[i + 256]) >> 16);
+            *pMCUSrc++ = (((sQ2 + d) * pQuant[i + 128]) >> 16);
         }
     } // for
     sum = 0;
-    for (i=29; i<64; i++) // second half; check for 'sparseness'
+    for (i=33; i<64; i++) // second half; check for 'sparseness'
     {
         sQ1 = pQuant[i];
         sQ2 = sQ1 >> 1;
@@ -821,12 +830,12 @@ int JPEGQuantize(JPEGIMAGE *pJPEG, signed short *pMCUSrc, int iTable)
         // so that we can use multiplies in this step
         if (d < 0)
         {
-            d = 0 - (((sQ2 - d) * pQuant[i + 256]) >> 16);
+            d = 0 - (((sQ2 - d) * pQuant[i + 128]) >> 16);
             sum -= d;
         }
         else
         {
-            d = (((sQ2 + d) * pQuant[i + 256]) >> 16);
+            d = (((sQ2 + d) * pQuant[i + 128]) >> 16);
             sum += d;
         }
         *pMCUSrc++ = d;
@@ -880,7 +889,7 @@ int JPEGEncodeMCU(int iDCTable, JPEGIMAGE *pJPEG, signed short *pMCUData, int iD
     // Encode the AC components
     pZig = (unsigned char *)&cZigZag2[1];
     if (bSparse)
-        pZigEnd = (unsigned char *)&cZigZag2[29]; // second half is all zeros
+        pZigEnd = (unsigned char *)&cZigZag2[33]; // second half is all zeros
     else
         pZigEnd = (unsigned char *)&cZigZag2[64];
     pHuff += 1024; // point to AC table
@@ -888,8 +897,7 @@ int JPEGEncodeMCU(int iDCTable, JPEGIMAGE *pJPEG, signed short *pMCUData, int iD
     {
         // count the number of leading zeros
         pZigStart = pZig;
-        while (pZig < pZigEnd && (iDelta = pMCUData[pZig[0]]) == 0)
-        {
+        while (pZig < pZigEnd && (iDelta = pMCUData[pZig[0]]) == 0) {
             pZig++;
         }
         if (pZig == pZigEnd) // special case, no more coefficients
@@ -932,17 +940,13 @@ encodemcuz:
     
 } /* JPEGEncodeMCU() */
 
-void JPEGGetMCU(unsigned char *pSrc, JPEGIMAGE *pPage, int iPitch, signed short *pMCUData)
+void JPEGGetMCU(unsigned char *pSrc, int iPitch, signed short *pMCU)
 {
     int cx, cy;
-    signed short *pDest;
     
-    pDest = pMCUData;
-    for (cy = 0; cy < 8; cy++)
-    {
-        for (cx = 0; cx < 8; cx++)
-        {
-            *pDest++ = (signed short)pSrc[0] - 128;
+    for (cy = 0; cy < 8; cy++) {
+        for (cx = 0; cx < 8; cx++) {
+            *pMCU++ = (signed short)pSrc[0] - 128;
             pSrc++;
         }
         pSrc += iPitch - 8; // skip to next line
@@ -1180,82 +1184,81 @@ void JPEGSample32(unsigned char *pSrc, signed short *pMCU, int lsize, int cx, in
 
 } /* JPEGSample32() */
 
-void JPEGGetMCU22(unsigned char *pImage, JPEGIMAGE *pPage, int lsize, int x, int y, signed short *pMCUData, int bUseSIMD)
+void JPEGGetMCU22(unsigned char *pImage, JPEGIMAGE *pPage, int iPitch)
 {
     int cx, cy, width, height;
-    //signed short *pDest;
-    unsigned char *pSrc = NULL;
-    
-    if (pPage->ucPixelType == JPEG_PIXEL_RGB565)
-        pSrc = pImage + x*16*2 + (y * 16 * lsize);
-    else if (pPage->ucPixelType == JPEG_PIXEL_RGB888)
-        pSrc = pImage + x*16*3 + (y * 16 * lsize);
-    else if (pPage->ucPixelType == JPEG_PIXEL_ARGB8888)
-        pSrc = pImage + x*16*4 + (y * 16 * lsize);
-    else
-        return; // invalid bit depth
+    signed short *pMCUData = pPage->MCUs;
+//    if (pPage->ucPixelType == JPEG_PIXEL_RGB565)
+//        pSrc = pImage + x*16*2 + (y * 16 * lsize);
+//    else if (pPage->ucPixelType == JPEG_PIXEL_RGB888)
+//        pSrc = pImage + x*16*3 + (y * 16 * lsize);
+//    else if (pPage->ucPixelType == JPEG_PIXEL_ARGB8888)
+//        pSrc = pImage + x*16*4 + (y * 16 * lsize);
+//    else
+//        return; // invalid bit depth
     //    pDest = pMCUData;
+    cx = cy = 8;
     width = height = 16;
-    if (x*16 + width > pPage->iWidth)
-        width = pPage->iWidth & 15;
-    if (y*16 + height > pPage->iHeight)
-        height = pPage->iHeight & 15;
-    if (width < 8)
-        cx = width;
-    else
-        cx = 8;
-    if (height < 8)
-        cy = height;
-    else
-        cy = 8;
-    if (cy != 8 || cx != 8) // for edge MCUs, make sure all unused slots are 0
-        memset(pMCUData, 0, 6*64*sizeof(short));
+//    if (x*16 + width > pPage->iWidth)
+//        width = pPage->iWidth & 15;
+//    if (y*16 + height > pPage->iHeight)
+//        height = pPage->iHeight & 15;
+//    if (width < 8)
+//        cx = width;
+//    else
+//        cx = 8;
+//    if (height < 8)
+//        cy = height;
+//    else
+//        cy = 8;
+//    if (cy != 8 || cx != 8) // for edge MCUs, make sure all unused slots are 0
+//        memset(pMCUData, 0, 6*64*sizeof(short));
     if (pPage->ucPixelType == JPEG_PIXEL_RGB565)
     {
         // upper left
-        JPEGSubSample16(pSrc, pMCUData, &pMCUData[DCTSIZE*4], &pMCUData[DCTSIZE*5], lsize, cx, cy);
+        JPEGSubSample16(pImage, pMCUData, &pMCUData[DCTSIZE*4], &pMCUData[DCTSIZE*5], iPitch, cx, cy);
         // upper right
         if (width > 8)
-            JPEGSubSample16(pSrc+8*2, &pMCUData[DCTSIZE*1], &pMCUData[4+DCTSIZE*4], &pMCUData[4+DCTSIZE*5], lsize, width-8, cy);
+            JPEGSubSample16(pImage+8*2, &pMCUData[DCTSIZE*1], &pMCUData[4+DCTSIZE*4], &pMCUData[4+DCTSIZE*5], iPitch, width-8, cy);
         if (height > 8)
         {
             // lower left
-            JPEGSubSample16(pSrc+8*lsize, &pMCUData[DCTSIZE*2], &pMCUData[32+DCTSIZE*4], &pMCUData[32+DCTSIZE*5], lsize, cx, height - 8);
+            JPEGSubSample16(pImage+8*iPitch, &pMCUData[DCTSIZE*2], &pMCUData[32+DCTSIZE*4], &pMCUData[32+DCTSIZE*5], iPitch, cx, height - 8);
             // lower right
             if (width > 8)
-                JPEGSubSample16(pSrc+8*lsize + 8*2, &pMCUData[DCTSIZE*3], &pMCUData[36+DCTSIZE*4], &pMCUData[36+DCTSIZE*5], lsize, width - 8, height - 8);
+                JPEGSubSample16(pImage+8*iPitch + 8*2, &pMCUData[DCTSIZE*3], &pMCUData[36+DCTSIZE*4], &pMCUData[36+DCTSIZE*5], iPitch, width - 8, height - 8);
         }
     }
     else if (pPage->ucPixelType == JPEG_PIXEL_RGB888)
     {
         // upper left
-        JPEGSubSample24(pSrc, pMCUData, &pMCUData[DCTSIZE*4], &pMCUData[DCTSIZE*5], lsize, cx, cy);
+        JPEGSubSample24(pImage, pMCUData, &pMCUData[DCTSIZE*4], &pMCUData[DCTSIZE*5], iPitch, cx, cy);
         // upper right
         if (width > 8)
-            JPEGSubSample24(pSrc+8*3, &pMCUData[DCTSIZE*1], &pMCUData[4+DCTSIZE*4], &pMCUData[4+DCTSIZE*5], lsize, width-8, cy);
+            JPEGSubSample24(pImage+8*3, &pMCUData[DCTSIZE*1], &pMCUData[4+DCTSIZE*4], &pMCUData[4+DCTSIZE*5], iPitch, width-8, cy);
         if (height > 8)
         {
             // lower left
-            JPEGSubSample24(pSrc+8*lsize, &pMCUData[DCTSIZE*2], &pMCUData[32+DCTSIZE*4], &pMCUData[32+DCTSIZE*5], lsize, cx, height - 8);
+            JPEGSubSample24(pImage+8*iPitch, &pMCUData[DCTSIZE*2], &pMCUData[32+DCTSIZE*4], &pMCUData[32+DCTSIZE*5], iPitch, cx, height - 8);
             // lower right
             if (width > 8)
-                JPEGSubSample24(pSrc+8*lsize + 8*3, &pMCUData[DCTSIZE*3], &pMCUData[36+DCTSIZE*4], &pMCUData[36+DCTSIZE*5], lsize, width - 8, height - 8);
+                JPEGSubSample24(pImage+8*iPitch + 8*3, &pMCUData[DCTSIZE*3], &pMCUData[36+DCTSIZE*4], &pMCUData[36+DCTSIZE*5], iPitch, width - 8, height - 8);
         }
     }
     else if (pPage->ucPixelType == JPEG_PIXEL_ARGB8888)
     {
         // upper left
-        JPEGSubSample32(pSrc, pMCUData, &pMCUData[DCTSIZE*4], &pMCUData[DCTSIZE*5], lsize, cx, cy);
+        JPEGSubSample32(pImage, pMCUData, &pMCUData[DCTSIZE*4], &pMCUData[DCTSIZE*5], iPitch, cx, cy);
         // upper right
         if (width > 8)
-            JPEGSubSample32(pSrc+8*4, &pMCUData[DCTSIZE*1], &pMCUData[4+DCTSIZE*4], &pMCUData[4+DCTSIZE*5], lsize, width-8, cy);
+            JPEGSubSample32(pImage+8*4, &pMCUData[DCTSIZE*1], &pMCUData[4+DCTSIZE*4], &pMCUData[4+DCTSIZE*5], iPitch, width-8, cy);
         if (height > 8)
         {
             // lower left
-            JPEGSubSample32(pSrc+8*lsize, &pMCUData[DCTSIZE*2], &pMCUData[32+DCTSIZE*4], &pMCUData[32+DCTSIZE*5], lsize, cx, height - 8);
+            JPEGSubSample32(pImage+8*iPitch, &pMCUData[DCTSIZE*2], &pMCUData[32+DCTSIZE*4], &pMCUData[32+DCTSIZE*5], iPitch, cx, height - 8);
             // lower right
             if (width > 8)
-                JPEGSubSample32(pSrc+8*lsize + 8*4, &pMCUData[DCTSIZE*3], &pMCUData[36+DCTSIZE*4], &pMCUData[36+DCTSIZE*5], lsize, width - 8, height - 8);
+                JPEGSubSample32(pImage+8*iPitch + 8*4, &pMCUData[DCTSIZE*3], &pMCUData[36+DCTSIZE*4], &pMCUData[36+DCTSIZE*5], iPitch, width - 8, height - 8);
         }
     }
 } /* JPEGGetMCU22() */
@@ -1334,37 +1337,26 @@ void JPEGSample24(unsigned char *pSrc, signed short *pMCU, int lsize, int cx, in
     
 } /* JPEGSample24() */
 
-void JPEGGetMCU11(unsigned char *pImage, JPEGIMAGE *pPage, int lsize, int x, int y, signed short *pMCUData, int bUseSIMD)
+void JPEGGetMCU11(unsigned char *pImage, JPEGIMAGE *pPage, int iPitch)
 {
     int cx, cy;
-    //signed short *pDest;
-    unsigned char *pSrc;
-    
-    if (pPage->ucPixelType == JPEG_PIXEL_RGB888)
-        pSrc = pImage + x*8*3 + (y * 8 * lsize);
-    else if (pPage->ucPixelType == JPEG_PIXEL_RGB565)
-        pSrc = pImage + x*8*2 + (y * 8 * lsize);
-    else // 32bpp
-        pSrc = pImage + x*8*4 + (y * 8 * lsize);
-    //    pDest = pMCUData;
-    if (x*8 + 8 > pPage->iWidth)
-        cx = pPage->iWidth & 7;
-    else
+    signed short *pMCUData = pPage->MCUs;
+//    if (x*8 + 8 > pPage->iWidth)
+//        cx = pPage->iWidth & 7;
+//    else
         cx = 8;
-    if (y*8 + 8 > pPage->iHeight)
-        cy = pPage->iHeight & 7;
-    else
+//    if (y*8 + 8 > pPage->iHeight)
+//        cy = pPage->iHeight & 7;
+//    else
         cy = 8;
-    if (cy != 8 || cx != 8)
-        memset(pMCUData, 0, 3*64*sizeof(short)); // make sure unused pixels are 0
+//    if (cy != 8 || cx != 8)
+//        memset(pMCUData, 0, 3*64*sizeof(short)); // make sure unused pixels are 0
     if (pPage->ucPixelType == JPEG_PIXEL_RGB888)
-    {
-        JPEGSample24(pSrc, pMCUData, lsize, cx, cy);
-    }
+        JPEGSample24(pImage, pMCUData, iPitch, cx, cy);
     else if (pPage->ucPixelType == JPEG_PIXEL_RGB565)
-        JPEGSample16(pSrc, pMCUData, lsize, cx, cy);
+        JPEGSample16(pImage, pMCUData, iPitch, cx, cy);
     else // must be 32-bpp
-        JPEGSample32(pSrc, pMCUData, lsize, cx, cy);
+        JPEGSample32(pImage, pMCUData, iPitch, cx, cy);
     
 } /* JPEGGetMCU11() */
 
@@ -1474,7 +1466,7 @@ int JPEGAddMCU(JPEGIMAGE *pJPEG, JPEGENCODE *pEncode, uint8_t *pPixels, int iPit
         return JPEG_INVALID_PARAMETER;
     }
     if (pJPEG->ucPixelType == JPEG_PIXEL_GRAYSCALE) {
-        JPEGGetMCU(pPixels, pJPEG, iPitch, pJPEG->MCUs);
+        JPEGGetMCU(pPixels, iPitch, pJPEG->MCUs);
         JPEGFDCT(pJPEG->MCUs);
         bSparse = JPEGQuantize(pJPEG, pJPEG->MCUs, 0);
         pJPEG->iDCPred0 = JPEGEncodeMCU(0, pJPEG, pJPEG->MCUs, pJPEG->iDCPred0, bSparse);
@@ -1492,596 +1484,74 @@ int JPEGAddMCU(JPEGIMAGE *pJPEG, JPEGENCODE *pEncode, uint8_t *pPixels, int iPit
             }
         } else {
             pEncode->x += pEncode->cx;
+        } // grayscale
+    } else { // color
+        if (pJPEG->ucSubSample == JPEG_SUBSAMPLE_444) {
+            JPEGGetMCU11(pPixels, pJPEG, iPitch);
+            JPEGFDCT(&pJPEG->MCUs[0*DCTSIZE]);
+            JPEGFDCT(&pJPEG->MCUs[1*DCTSIZE]);
+            JPEGFDCT(&pJPEG->MCUs[2*DCTSIZE]);
+            // Y
+            bSparse = JPEGQuantize(pJPEG, &pJPEG->MCUs[0], 0);
+            pJPEG->iDCPred0 = JPEGEncodeMCU(0, pJPEG, pJPEG->MCUs, pJPEG->iDCPred0, bSparse);
+            // Cb
+            bSparse = JPEGQuantize(pJPEG, &pJPEG->MCUs[DCTSIZE], 1);
+            pJPEG->iDCPred1 = JPEGEncodeMCU(1, pJPEG, &pJPEG->MCUs[DCTSIZE], pJPEG->iDCPred1, bSparse);
+            // Cr
+            bSparse = JPEGQuantize(pJPEG, &pJPEG->MCUs[2*DCTSIZE], 1);
+            pJPEG->iDCPred2 = JPEGEncodeMCU(1, pJPEG, &pJPEG->MCUs[2*DCTSIZE], pJPEG->iDCPred2, bSparse);
+        } else { // must be 420
+            JPEGGetMCU22(pPixels, pJPEG, iPitch);
+            JPEGFDCT(&pJPEG->MCUs[0*DCTSIZE]); // Y0
+            JPEGFDCT(&pJPEG->MCUs[1*DCTSIZE]); // Y1
+            JPEGFDCT(&pJPEG->MCUs[2*DCTSIZE]); // Y2
+            JPEGFDCT(&pJPEG->MCUs[3*DCTSIZE]); // Y3
+            JPEGFDCT(&pJPEG->MCUs[4*DCTSIZE]); // Cb
+            JPEGFDCT(&pJPEG->MCUs[5*DCTSIZE]); // Cr
+            // Y0
+            bSparse = JPEGQuantize(pJPEG, &pJPEG->MCUs[0*DCTSIZE], 0);
+            pJPEG->iDCPred0 = JPEGEncodeMCU(0, pJPEG, &pJPEG->MCUs[0*DCTSIZE], pJPEG->iDCPred0, bSparse);
+            // Y1
+            bSparse = JPEGQuantize(pJPEG, &pJPEG->MCUs[1*DCTSIZE], 0);
+            pJPEG->iDCPred0 = JPEGEncodeMCU(0, pJPEG, &pJPEG->MCUs[1*DCTSIZE], pJPEG->iDCPred0, bSparse);
+            // Y2
+            bSparse = JPEGQuantize(pJPEG, &pJPEG->MCUs[2*DCTSIZE], 0);
+            pJPEG->iDCPred0 = JPEGEncodeMCU(0, pJPEG, &pJPEG->MCUs[2*DCTSIZE], pJPEG->iDCPred0, bSparse);
+            // Y3
+            bSparse = JPEGQuantize(pJPEG, &pJPEG->MCUs[3*DCTSIZE], 0);
+            pJPEG->iDCPred0 = JPEGEncodeMCU(0, pJPEG, &pJPEG->MCUs[3*DCTSIZE], pJPEG->iDCPred0, bSparse);
+            // Cb
+            bSparse = JPEGQuantize(pJPEG, &pJPEG->MCUs[4*DCTSIZE], 1);
+            pJPEG->iDCPred1 = JPEGEncodeMCU(1, pJPEG, &pJPEG->MCUs[4*DCTSIZE], pJPEG->iDCPred1, bSparse);
+            // Cr
+            bSparse = JPEGQuantize(pJPEG, &pJPEG->MCUs[5*DCTSIZE], 1);
+            pJPEG->iDCPred2 = JPEGEncodeMCU(1, pJPEG, &pJPEG->MCUs[5*DCTSIZE], pJPEG->iDCPred2, bSparse);
+        } // 420 subsample
+        if (pEncode->x >= (pJPEG->iWidth - pEncode->cx)) { // end of the row?
+            // Store the restart marker
+            FlushCode(&pJPEG->pc);
+            *(pJPEG->pc.pOut)++ = 0xff; // store restart marker
+            *(pJPEG->pc.pOut)++ = (unsigned char) (0xd0 + (pJPEG->iRestart & 7));
+            pJPEG->iRestart++;
+            pJPEG->iDCPred0 = pJPEG->iDCPred1 = pJPEG->iDCPred2 = 0; // reset the DC predictors
+            pEncode->x = 0;
+            pEncode->y += pEncode->cy;
+            if (pEncode->y >= pJPEG->iHeight && pJPEG->pOutput) {
+                pJPEG->iDataSize = (int)(pJPEG->pc.pOut - pJPEG->pOutput);
+            }
+        } else {
+            pEncode->x += pEncode->cx;
+        } // grayscale
+    }
+    if (pJPEG->pc.pOut >= pJPEG->pHighWater) { // out of space or need to write incremental buffer
+        if (pJPEG->pOutput) { // the user-supplied buffer is not big enough
+            return JPEG_NO_BUFFER;
+        } else { // write current block of data
+            int iLen = (int)(pJPEG->pc.pOut - pJPEG->ucFileBuf);
+            pJPEG->pfnWrite(&pJPEG->JPEGFile, pJPEG->ucFileBuf, iLen);
+            pJPEG->iDataSize += iLen;
+            pJPEG->pc.pOut = pJPEG->ucFileBuf;
         }
-    } // grayscale
-    //
+    }
     return JPEG_SUCCESS;
 } /* JPEGAddMCU() */
-
-#ifdef NOT_USED
-void MakeGrayJPEG(JPEGIMAGE *pJPEG)
-{
-    unsigned char *pImage;
-    signed short *pMCUData;
-    int x, y, cx, cy, iDCPred;
-    int lsize;
-    int iRestart;
-    int bSparse;
-    
-    iRestart = pSlice->uiResCount;
-    ppTemp.cBitsperpixel = (char)pSlice->iDCPred1; // stored here
-    ppTemp.iWidth = pSlice->uiWidth;
-    ppTemp.iHeight = pSlice->uiHeight;
-    ppTemp.iPitch = pSlice->uiPitch;
-    
-    pJPEG->pc.iLen = 0;
-    pJPEG->pc.ulAcc = 0;
-//    pJPEG->pc.pOut = pSlice->pData;
-    
-    pImage = pSlice->pBitmap;
-    lsize = pSlice->uiPitch;
-    pMCUData = pSlice->pMCU;
-    cx = (pSlice->uiWidth + 7)>>3; // number of MCU blocks
-    cy = (pSlice->uiHeight + 7)>>3;
-    //   pJPEG->pHuffDC = pJPEG->huffdc[0];
-    iDCPred = 0;
-    for (y=0; y<cy; y++)
-    {
-        for (x=0; x<cx; x++)
-        {
-            JPEGGetMCU(pImage, &ppTemp, lsize, x, y, pMCUData, pPalette);
-            JPEGFDCT(pMCUData);
-            bSparse = JPEGQuantize(pJPEG, pMCUData, 0);
-            iDCPred = JPEGEncodeMCU(0, pJPEG, pMCUData, &pc, iDCPred, bSparse);
-        }
-        // Store the restart marker
-        FlushCode(&pc);
-        *(pc.pOut)++ = 0xff; // store restart marker
-        *(pc.pOut)++ = (unsigned char) (0xd0 + (iRestart & 7));
-        iRestart++;
-        iDCPred = 0; // reset the DC predictor
-    }
-    FlushCode(&pc);
-    pSlice->uiLen = (int)(pc.pOut - pSlice->pData);
-    pSlice->iError = 0;
-    pSlice->uiFlag = PIL_THREAD_COMPLETE;
-    
-} /* MakeGrayJPEG() */
-
-/****************************************************************************
- *                                                                          *
- *  FUNCTION   : MakeColorJPEG()                                            *
- *                                                                          *
- *  PURPOSE    : Encode an image as RGB color JPEG.                         *
- *                                                                          *
- ****************************************************************************/
-void MakeColorJPEG(void *p)
-{
-    unsigned char *pImage;
-    signed short *pMCUData;
-    int x, y, cx, cy, iDCPred0, iDCPred1, iDCPred2;
-    int lsize, iQFactor, iRestart;
-    PIL_CODE pc;
-#if defined(_X86) && defined(_X64)
-    uint64_t bSparse;
-#else
-    int bSparse;
-#endif
-    JPEG_SLICE *pSlice = (JPEG_SLICE *) p;
-    JPEGDATA *pJPEG;
-    PIL_PAGE ppTemp;
-    int bUseSIMD;
-    
-    pJPEG = pSlice->pJPEG;
-    bUseSIMD = pJPEG->iOptions & PIL_CONVERT_SIMD;
-    iQFactor = pSlice->iDCPred0;
-    iRestart = pSlice->uiResCount; // restart marker to start this "slice"
-    ppTemp.cBitsperpixel = (char)pSlice->iDCPred1; // stored here
-    ppTemp.iWidth = pSlice->uiWidth;
-    ppTemp.iHeight = pSlice->uiHeight;
-    ppTemp.iPitch = pSlice->uiPitch;
-    ppTemp.cFlags = 0;
-    
-    // init code stream structure
-    pc.pOut = pSlice->pData; // output data pointer
-    pc.ulAcc = 0;
-    pc.iLen = 0;
-    
-    pImage = pSlice->pBitmap;
-    lsize = pSlice->uiPitch;
-    pMCUData = pSlice->pMCU;
-    iDCPred0 = iDCPred1 = iDCPred2 = 0;
-    if (iQFactor & PIL_CONVERT_QUALITY_SUBSAMPLE)
-    {
-        cx = (pSlice->uiWidth + 15)>>4; // number of MCU blocks
-        cy = (pSlice->uiHeight + 15)>>4;
-        for (y=0; y<cy; y++)
-        {
-            for (x=0; x<cx; x++)
-            {
-                JPEGGetMCU22(pImage, &ppTemp, lsize, x, y, pMCUData, pJPEG->iOptions & PIL_CONVERT_SIMD);
-                /*--- First, encode the 4 luma blocks ---*/
-                JPEGFDCT(pMCUData);
-                bSparse = JPEGQuantize(pJPEG, pMCUData, 0);
-                iDCPred0 = JPEGEncodeMCU(0, pJPEG, pMCUData, &pc, iDCPred0, bSparse);
-                
-                JPEGFDCT(&pMCUData[1*DCTSIZE]);
-                bSparse = JPEGQuantize(pJPEG, &pMCUData[1 * DCTSIZE], 0);
-                iDCPred0 = JPEGEncodeMCU(0, pJPEG, &pMCUData[1 * DCTSIZE], &pc, iDCPred0, bSparse);
-                
-                JPEGFDCT(&pMCUData[2*DCTSIZE]);
-                bSparse = JPEGQuantize(pJPEG, &pMCUData[2 * DCTSIZE], 0);
-                iDCPred0 = JPEGEncodeMCU(0, pJPEG, &pMCUData[2 * DCTSIZE], &pc, iDCPred0, bSparse);
-                
-                JPEGFDCT(&pMCUData[3*DCTSIZE]);
-                bSparse = JPEGQuantize(pJPEG, &pMCUData[3 * DCTSIZE], 0);
-                iDCPred0 = JPEGEncodeMCU(0, pJPEG, &pMCUData[3 * DCTSIZE], &pc, iDCPred0, bSparse);
-                
-                /*--- Now do the chroma blocks ---*/
-                JPEGFDCT(&pMCUData[4*DCTSIZE]);
-                bSparse = JPEGQuantize(pJPEG, &pMCUData[4 * DCTSIZE], 1);
-                iDCPred1 = JPEGEncodeMCU(1, pJPEG, &pMCUData[4 * DCTSIZE], &pc, iDCPred1, bSparse);
-                
-                JPEGFDCT(&pMCUData[5*DCTSIZE]);
-                bSparse = JPEGQuantize(pJPEG, &pMCUData[5 * DCTSIZE], 1);
-                iDCPred2 = JPEGEncodeMCU(1, pJPEG, &pMCUData[5 * DCTSIZE], &pc, iDCPred2, bSparse);
-            } // for x
-            // Store the restart marker
-            FlushCode(&pc);
-            *(pc.pOut)++ = 0xff; // store restart marker
-            *(pc.pOut)++ = (unsigned char) (0xd0 + (iRestart & 7));
-            iRestart++;
-            iDCPred0 = iDCPred1 = iDCPred2 = 0; // reset the DC predictors
-        } // for y
-    }
-    else
-    { // interleaved, but no subsampling
-        cx = (pSlice->uiWidth + 7)>>3; // number of MCU blocks
-        cy = (pSlice->uiHeight + 7)>>3;
-        for (y=0; y<cy; y++)
-        {
-            for (x=0; x<cx; x++)
-            {
-                JPEGGetMCU11(pImage, &ppTemp, lsize, x, y, pMCUData, bUseSIMD);
-                /*--- First, encode the luma block ---*/
-                JPEGFDCT(pMCUData);
-                bSparse = JPEGQuantize(pJPEG, pMCUData, 0);
-                iDCPred0 = JPEGEncodeMCU(0, pJPEG, pMCUData, &pc, iDCPred0, bSparse);
-                
-                /*--- Now do the chroma blocks ---*/
-                JPEGFDCT(&pMCUData[1*DCTSIZE]);
-                bSparse = JPEGQuantize(pJPEG, &pMCUData[1 * DCTSIZE], 1);
-                iDCPred1 = JPEGEncodeMCU(1, pJPEG, &pMCUData[1 * DCTSIZE], &pc, iDCPred1, bSparse);
-                
-                JPEGFDCT(&pMCUData[2*DCTSIZE]);
-                bSparse = JPEGQuantize(pJPEG, &pMCUData[2 * DCTSIZE], 1);
-                iDCPred2 = JPEGEncodeMCU(1, pJPEG, &pMCUData[2 * DCTSIZE], &pc, iDCPred2, bSparse);
-            } // for x
-            // Store the restart marker
-            FlushCode(&pc);
-            *(pc.pOut)++ = 0xff; // store restart marker
-            *(pc.pOut)++ = (unsigned char)(0xd0 + (iRestart & 7));
-            iRestart++;
-            iDCPred0 = iDCPred1 = iDCPred2 = 0; // reset the DC predictors
-        } // for y
-    }
-    FlushCode(&pc);
-    pSlice->uiLen = (int)(pc.pOut - pSlice->pData);
-    pSlice->iError = 0;
-    pSlice->uiFlag = PIL_THREAD_COMPLETE;
-    
-} /* MakeColorJPEG() */
-
-int PILMakeJPEG(PIL_PAGE *pPage, PIL_PAGE *pOutPage, int iQFactor)
-{
-    int i = 0, iOffset, iErr;
-    int iOutSize;
-    JPEGDATA *pJPEG;
-    unsigned char *pBuf;
-    int iNumThreads;
-    JPEG_SLICE pJPEGSlices[16];
-    
-    iErr = 0;
-    if (iQFactor & PIL_CONVERT_MULTITHREAD)
-    {
-        iNumThreads = PILIONumProcessors(); // see if we can accelerate the job
-    }
-    else
-    {
-        iNumThreads = 1; // user wants it to run on a single thread
-    }
-    //   iNumThreads = 1; // DEBUG - force single-threaded
-    if (iQFactor & PIL_CONVERT_NOALLOC)
-    {
-        pBuf = pOutPage->pData;
-        iOutSize = pPage->iDataSize; // assume it's the same size as the input image buffer
-    }
-    else
-    {
-        iOutSize = pPage->iDataSize + 8192;
-        pOutPage->pData = pBuf = (unsigned char *) PILIOAllocNoClear(iOutSize); // this is a temp buffer which will be reclaimed to the true size at the end
-        if (!pBuf) /* Allocate the output buffer structure */
-            return PIL_ERROR_MEMORY;
-    }
-    if (iQFactor & PIL_CONVERT_NOALLOC)
-        pJPEG =  pOutPage->pJPEG;
-    else
-        pJPEG = (JPEGDATA *)PILIOAlloc(sizeof(JPEGDATA));
-    iOffset = 0;
-    
-    if (pPage->cBitsperpixel != 8 && pPage->cBitsperpixel != 32 && pPage->cBitsperpixel != 24 && pPage->cBitsperpixel != 16 && pPage->cBitsperpixel != 17 && pPage->cBitsperpixel != 18)
-    {
-        iErr = PIL_ERROR_INVPARAM;
-        goto makejpegz;
-    }
-    if (pPage->cBitsperpixel == 8)
-        pJPEG->ucNumComponents = 1;
-    else
-        pJPEG->ucNumComponents = 3;
-    WRITEMOTO32(pBuf, iOffset, 0xffd8ffe0); // write app0 marker
-    iOffset += 4;
-    if (pOutPage->cCompression == PIL_COMP_JPEG)
-    {
-        WRITEMOTO32(pBuf, iOffset, 0x00104a46); // JFIF
-        iOffset += 4;
-        WRITEMOTO32(pBuf, iOffset, 0x49460001);
-        iOffset += 4;
-    }
-    else // motion jpeg uses another identifier
-    {
-        {
-            WRITEMOTO32(pBuf, iOffset, 0x00104156); // AVI1
-            iOffset += 4;
-            WRITEMOTO32(pBuf, iOffset, 0x49310001);
-            iOffset += 4;
-        }
-    }
-    WRITEMOTO16(pBuf, iOffset, 0x0101); // resolution units = dots per inch
-    iOffset += 2;
-    if (pPage->iXres > 0xffff || pPage->iXres < 0) // invalid value
-        pPage->iXres = 0;
-    if (pPage->iYres > 0xffff || pPage->iYres < 0) // invalid value
-        pPage->iYres = 0;
-    WRITEMOTO16(pBuf, iOffset, pPage->iXres); // store spacial resolution
-    iOffset += 2;
-    WRITEMOTO16(pBuf, iOffset, pPage->iYres);
-    iOffset += 2;
-    WRITEMOTO16(pBuf, iOffset, 0); // add 2 zeros
-    iOffset += 2;
-    // define quantization tables
-    WRITEMOTO16(pBuf, iOffset, 0xffdb); // quantization table marker
-    iOffset += 2;
-    WRITEMOTO16(pBuf, iOffset, 0x0043); // table size
-    iOffset += 2;
-    pBuf[iOffset++] = 0; // table type and number 0,8 bit
-    for (i=0; i<64; i++)
-    {
-        switch (iQFactor & 7) // adjust table depending on quality factor
-        {
-            default:
-            case 0: // best quality, divide by 4
-                pBuf[iOffset++] = quant_lum[i] >> 2;
-                break;
-            case 1: // high quality, divide by 2
-                pBuf[iOffset++] = quant_lum[i] >> 1;
-                break;
-            case 2: // medium quality factor, use values unchanged
-                pBuf[iOffset++] = quant_lum[i];
-                break;
-            case 3: // low quality, use values * 2
-                pBuf[iOffset++] = quant_lum[i] << 1;
-                break;
-            case 4: // ridiculously high quality
-                pBuf[iOffset++] = quant95_lum[i];
-                break;
-        }
-    }
-    if (pPage->cBitsperpixel > 8) // add color quant tables
-    {
-        WRITEMOTO16(pBuf, iOffset, 0xffdb); // quantization table
-        iOffset += 2;
-        WRITEMOTO16(pBuf, iOffset, 0x0043); // table size
-        iOffset += 2;
-        pBuf[iOffset++] = 1;  // table 1, 8 bit
-        for (i=0; i<64; i++)
-        {
-            switch (iQFactor & 7) // adjust table depending on quality factor
-            {
-                case 0: // best quality, divide by 4
-                    pBuf[iOffset++] = quant_color[i] >> 2;
-                    break;
-                case 1: // high quality, divide by 2
-                    pBuf[iOffset++] = quant_color[i] >> 1;
-                    break;
-                case 2: // medium quality factor, use values unchanged
-                    pBuf[iOffset++] = quant_color[i];
-                    break;
-                case 3: // low quality, use values * 2
-                    pBuf[iOffset++] = quant_color[i] << 1;
-                    break;
-                case 4: // ridiculously high quality
-                    pBuf[iOffset++] = quant95_color[i];
-                    break;
-            }
-        }
-    }
-    // store the restart interval
-    // use an interval of one MCU row
-    if ((iQFactor & PIL_CONVERT_QUALITY_SUBSAMPLE) && pPage->cBitsperpixel > 8)
-        i = (pPage->iWidth + 15) / 16; // number of MCUs in a row
-    else
-        i = (pPage->iWidth + 7) / 8;
-    WRITEMOTO16(pBuf, iOffset, 0xffdd); // DRI marker
-    iOffset += 2;
-    WRITEMOTO16(pBuf, iOffset, 4); // fixed length of 4
-    iOffset += 2;
-    WRITEMOTO16(pBuf, iOffset, i); // restart interval count
-    iOffset += 2;
-    
-    // store the frame header
-    WRITEMOTO16(pBuf, iOffset, 0xffc0); // SOF0 marker
-    iOffset += 2;
-    if (pPage->cBitsperpixel == 8)
-    {
-        pBuf[iOffset++] = 0;
-        pBuf[iOffset++] = 11; // length = 11
-        pBuf[iOffset++] = 8;   // sample precision
-        WRITEMOTO16(pBuf, iOffset, pPage->iHeight); // image height
-        iOffset += 2;
-        WRITEMOTO16(pBuf, iOffset, pPage->iWidth); // image width
-        iOffset += 2;
-        pBuf[iOffset++] = 1; // number of components = 1 (grayscale)
-        pBuf[iOffset++] = 0; // component number
-        WRITEMOTO16(pBuf, iOffset, 0x1100); // subsampling and quant table selector
-        iOffset += 2;
-    }
-    else  // set up color stuff
-    {
-        pBuf[iOffset++] = 0;
-        pBuf[iOffset++] = 17; // length = 17
-        pBuf[iOffset++] = 8;   // sample precision
-        WRITEMOTO16(pBuf, iOffset, pPage->iHeight); // image height
-        iOffset += 2;
-        WRITEMOTO16(pBuf, iOffset, pPage->iWidth); // image width
-        iOffset += 2;
-        pBuf[iOffset++] = 3; // number of components = 3 (Ycc)
-        pBuf[iOffset++] = 0; // component number 0 (Y)
-        if (iQFactor & PIL_CONVERT_QUALITY_SUBSAMPLE)
-        {
-            WRITEMOTO16(pBuf, iOffset, 0x2200); // 2:1 subsampling and quant table selector
-        }
-        else
-        {
-            WRITEMOTO16(pBuf, iOffset, 0x1100); // no subsampling and quant table selector
-        }
-        iOffset += 2;
-        pBuf[iOffset++] = 1; // component number 1 (Cb)
-        WRITEMOTO16(pBuf, iOffset, 0x1101); // subsampling and quant table selector
-        iOffset += 2;
-        pBuf[iOffset++] = 2; // component number 2 (Cr)
-        WRITEMOTO16(pBuf, iOffset, 0x1101); // subsampling and quant table selector
-        iOffset += 2;
-    }
-    // define Huffman tables
-    WRITEMOTO16(pBuf, iOffset, 0xffc4); // Huffman DC table
-    iOffset += 2;
-    WRITEMOTO16(pBuf, iOffset, 0x1f); // Table length = 31
-    iOffset += 2;
-    pBuf[iOffset++] = 0; // table class = 0 (DC), id = 0
-    memcpy(&pBuf[iOffset], huffl_dc, 28); // copy DC table
-    iOffset += 28;
-    // now the AC table
-    WRITEMOTO16(pBuf, iOffset, 0xffc4); // Huffman AC table
-    iOffset += 2;
-    WRITEMOTO16(pBuf, iOffset, 0xb5); // Table length = 181
-    iOffset += 2;
-    pBuf[iOffset++] = 0x10; // table class = 1 (AC), id = 0
-    memcpy(&pBuf[iOffset], huffl_ac, 178); // copy AC table
-    iOffset += 178;
-    if (pPage->cBitsperpixel > 8) // define a second set of tables for color
-    {
-        WRITEMOTO16(pBuf, iOffset, 0xffc4); // Huffman DC table
-        iOffset += 2;
-        WRITEMOTO16(pBuf, iOffset, 0x1f); // Table length = 31
-        iOffset += 2;
-        pBuf[iOffset++] = 1; // table class = 0 (DC), id = 1
-        memcpy(&pBuf[iOffset], huffcr_dc, 28); // copy DC table
-        iOffset += 28;
-        // now the AC table
-        WRITEMOTO16(pBuf, iOffset, 0xffc4); // Huffman AC table
-        iOffset += 2;
-        WRITEMOTO16(pBuf, iOffset, 0xb5); // Table length = 181
-        iOffset += 2;
-        pBuf[iOffset++] = 0x11; // table class = 1 (AC), id = 1
-        memcpy(&pBuf[iOffset], huffcr_ac, 178); // copy AC table
-        iOffset += 178;
-    }
-    // Define the start of scan header (SOS)
-    WRITEMOTO16(pBuf, iOffset, 0xffda); // SOS
-    iOffset += 2;
-    if (pPage->cBitsperpixel == 8)
-    {
-        WRITEMOTO16(pBuf, iOffset, 0x8); // Table length = 8
-        iOffset += 2;
-        pBuf[iOffset++] = 1;            // number of components in scan = 1 (grayscale)
-        pBuf[iOffset++] = 0; // component id = 0
-        pBuf[iOffset++] = 0; // dc/ac huffman table = 0/0
-    }
-    else // color
-    {
-        WRITEMOTO16(pBuf, iOffset, 0xc); // Table length = 12
-        iOffset += 2;
-        pBuf[iOffset++] = 3;            // number of components in scan = 3 (color)
-        pBuf[iOffset++] = 0; // component id = 0
-        pBuf[iOffset++] = 0; // dc/ac huffman table = 0/0
-        pBuf[iOffset++] = 1; // component id = 1
-        pBuf[iOffset++] = 0x11; // dc/ac huffman table = 1/1
-        pBuf[iOffset++] = 2; // component id = 2
-        pBuf[iOffset++] = 0x11; // dc/ac huffman table = 1/1
-    }
-    pBuf[iOffset++] = 0; // start of spectral selection
-    pBuf[iOffset++] = 63; // end of spectral selection
-    pBuf[iOffset++] = 0; // successive approximation bit
-    
-    // prepare the luma & chroma quantization tables
-    for (i = 0; i<64; i++)
-    {
-        switch (iQFactor & 7)
-        {
-            case 0:
-                pJPEG->sQuantTable[i] = quant_lum[i] >> 2;
-                pJPEG->sQuantTable[i + 64] = quant_color[i] >> 2;
-                break;
-            case 1:
-                pJPEG->sQuantTable[i] = (quant_lum[i] >> 1);
-                pJPEG->sQuantTable[i + 64] = (quant_color[i] >> 1);
-                break;
-            case 2:
-                pJPEG->sQuantTable[i] = quant_lum[i];
-                pJPEG->sQuantTable[i + 64] = quant_color[i];
-                break;
-            case 3:
-                pJPEG->sQuantTable[i] = (quant_lum[i] << 1);
-                pJPEG->sQuantTable[i + 64] = (quant_color[i] << 1);
-                break;
-            case 4: // ridiculous quality
-                pJPEG->sQuantTable[i] = quant95_lum[i];
-                pJPEG->sQuantTable[i + 64] = quant95_color[i];
-                break;
-        }
-    }
-    JPEGFixQuantE(pJPEG); // reorder and scale quant table(s)
-    JPEGMakeHuffE(pJPEG); // create the Huffman tables to encode
-    
-    // Prepare 1 or more "slices" to encode the image with multiple threads
-    if (iNumThreads > 1)
-    {
-        int cy, dy, iRowsPerThread; // we divide the output into restart intervals of 1 row each
-        int iRowsToCompress, iOutDelta, iRemainder;
-        int iStartingRow;
-        if ((iQFactor & PIL_CONVERT_QUALITY_SUBSAMPLE) && pPage->cBitsperpixel > 8)
-        {
-            cy = (pPage->iHeight + 15) / 16; // number of MCU rows
-            dy = 16;
-        }
-        else
-        {
-            cy = (pPage->iHeight + 7) / 8; // number of MCU rows
-            dy = 8;
-        }
-        iRowsPerThread = cy / iNumThreads;
-        iRemainder = cy % iNumThreads; // divide the remainder evenly among the threads
-        iOutDelta = iOutSize / iNumThreads;
-        iStartingRow = 0;
-        for (i = 0; i < iNumThreads; i++) // divide up the job
-        {
-            iRowsToCompress = iRowsPerThread*dy; // scanlines for the each thread to process
-            if (iRemainder)
-            {
-                iRowsToCompress += dy; // spread out the remainder as evenly as possible
-                iRemainder--;
-            }
-            if ((iStartingRow + iRowsToCompress) > pPage->iHeight) // last piece might be beyond true end of image by up to dy-1 lines
-                iRowsToCompress = pPage->iHeight - iStartingRow;
-            pJPEGSlices[i].pBitmap = &pPage->pData[pPage->iOffset + (iStartingRow*pPage->iPitch)]; // starting point in the image
-            pJPEGSlices[i].uiPitch = pPage->iPitch;
-            pJPEGSlices[i].pJPEG = pJPEG;
-            pJPEGSlices[i].pData = &pBuf[iOffset + (iOutDelta*i)]; // divide up the output buffer
-            pJPEGSlices[i].uiWidth = pPage->iWidth;
-            pJPEGSlices[i].uiHeight = iRowsToCompress;
-            pJPEGSlices[i].pPalette = pPage->pPalette;
-            pJPEGSlices[i].uiResCount = iStartingRow / dy; // starting restart marker value
-            pJPEGSlices[i].iDCPred0 = iQFactor;
-            pJPEGSlices[i].iDCPred1 = pPage->cBitsperpixel;
-            pJPEGSlices[i].iDCPred2 = i; // DEBUG - not needed
-            pJPEGSlices[i].uiFlag = PIL_THREAD_BUSY; // indicates thread is still working
-            iStartingRow += iRowsToCompress;
-        }
-    }
-    else // single job
-    {
-        pJPEGSlices[0].pBitmap = &pPage->pData[pPage->iOffset];
-        pJPEGSlices[0].uiPitch = pPage->iPitch;
-        pJPEGSlices[0].pJPEG = pJPEG;
-        pJPEGSlices[0].pData = &pBuf[iOffset];
-        pJPEGSlices[0].uiWidth = pPage->iWidth;
-        pJPEGSlices[0].uiHeight = pPage->iHeight;
-        pJPEGSlices[0].pPalette = pPage->pPalette;
-        pJPEGSlices[0].uiResCount = 0; // starting restart value
-        pJPEGSlices[0].iDCPred0 = iQFactor;
-        pJPEGSlices[0].iDCPred1 = pPage->cBitsperpixel;
-        pJPEGSlices[0].uiFlag = PIL_THREAD_BUSY; // indicates thread is still working
-    }
-    for (i = 0; i < iNumThreads - 1; i++) // spawn off N threads to do the job
-    {
-        if (pPage->cBitsperpixel == 8)
-        {
-            PILIOCreateThread((void*) MakeGrayJPEG, &pJPEGSlices[i], i + 1);
-        }
-        else
-        {
-            PILIOCreateThread((void*) MakeColorJPEG, &pJPEGSlices[i], i + 1);
-        }
-    } // spread job across threads
-    // Last thread is done on the current thread
-    if (pPage->cBitsperpixel == 8)
-        MakeGrayJPEG(&pJPEGSlices[iNumThreads - 1]);
-    else
-    {
-        MakeColorJPEG(&pJPEGSlices[iNumThreads - 1]);
-        pOutPage->cBitsperpixel = 24; // if left to be 16/17/32/etc, it can mess up writing it to TIFF/PDF files
-    }
-    // Wait for all threads to finish
-    if (iNumThreads > 1)
-    {
-        int bFinished = FALSE;
-        while (!bFinished)
-        {
-            bFinished = TRUE;
-            PILIOSleep(1); // yield to other threads while we wait
-            for (i = 0; i < iNumThreads - 1; i++)
-            {
-                if (pJPEGSlices[i].uiFlag != PIL_THREAD_COMPLETE)
-                    bFinished = FALSE;
-            }
-        }
-        // Glue the output buffers together to make a single data stream
-        iOutSize = iOffset + pJPEGSlices[0].uiLen; // start at the end of the first slice's output
-        for (i = 1; i < iNumThreads; i++)
-        {
-            int j;
-            for (j = 0; j < (int)pJPEGSlices[i].uiLen; j++) // move everything together to form a single buffer
-                pBuf[iOutSize++] = pJPEGSlices[i].pData[j];
-        }
-    }
-    else
-    {
-        iOutSize = iOffset + pJPEGSlices[0].uiLen; // single slice of data
-    }
-    
-makejpegz:
-    if (!(iQFactor & PIL_CONVERT_NOALLOC))
-        PILIOFree(pJPEG);
-    if (iErr == 0)
-    {
-        pBuf[iOutSize++] = 0xff;
-        pBuf[iOutSize++] = 0xd9;  // end of image (EOI)
-        pOutPage->iDataSize = iOutSize;
-    }
-    pOutPage->cState = PIL_PAGE_STATE_LOADED;
-    pOutPage->iOffset = 0;
-    // re-allocate the output buffer to be the size needed, nothing more
-    if (iErr == 0)
-    {
-        pBuf = (unsigned char *) PILIOAlloc(pOutPage->iDataSize);
-        if (pBuf != NULL)
-        {
-            memcpy(pBuf, pOutPage->pData, pOutPage->iDataSize);
-            PILIOFree(pOutPage->pData);
-            pOutPage->pData = pBuf;
-        }
-    }
-    return iErr;
-    
-} /* PILMakeJPEG() */
-#endif

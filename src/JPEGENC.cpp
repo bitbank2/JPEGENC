@@ -36,6 +36,7 @@ int JPEG::open(const char *szFilename, JPEG_OPEN_CALLBACK *pfnOpen, JPEG_CLOSE_C
     _jpeg.pfnOpen = pfnOpen;
     _jpeg.pfnClose = pfnClose;
     _jpeg.JPEGFile.fHandle = (*pfnOpen)(szFilename);
+    _jpeg.pHighWater = &_jpeg.ucFileBuf[JPEG_FILE_BUF_SIZE - 512];
     if (_jpeg.JPEGFile.fHandle == NULL) {
         _jpeg.iError = JPEG_INVALID_FILE;
        return JPEG_INVALID_FILE;
@@ -49,6 +50,8 @@ int JPEG::open(uint8_t *pOutput, int iBufferSize)
     memset(&_jpeg, 0, sizeof(JPEGIMAGE));
     _jpeg.pOutput = pOutput;
     _jpeg.iBufferSize = iBufferSize;
+    _jpeg.pHighWater = &pOutput[iBufferSize - 512];
+
     return JPEG_SUCCESS;
 } /* open() */
 

@@ -46,7 +46,6 @@
 
 /* Defines and variables */
 #define JPEG_FILE_BUF_SIZE 2048
-#define JPEG_FILE_HIGHWATER ((JPEG_FILE_BUF_SIZE * 3)/4)
 
 #define DCTSIZE 64
 
@@ -151,7 +150,7 @@ typedef struct jpeg_image_tag
     int x, y; // current MCU x/y
     uint8_t ucPixelType, ucSubSample, ucNumComponents;
     uint8_t ucMemType;
-    uint8_t *pOutput;
+    uint8_t *pOutput, *pHighWater;
     int iBufferSize; // output buffer size provided by caller
     int iHeaderSize; // size of the PNG header
     int iCompressedSize; // size of flate output
@@ -162,7 +161,7 @@ typedef struct jpeg_image_tag
     int iDCPred0, iDCPred1, iDCPred2; // DC predictor values for the 3 color components
     PIL_CODE pc;
     int *huffdc[4]; // DEBUG - placeholder
-    signed short sQuantTable[DCTSIZE*2];
+    signed short sQuantTable[DCTSIZE*4];
     signed short MCUs[6*DCTSIZE];
     uint8_t ucHuffACDCBuf[2048*sizeof(int)]; // DEBUG
     JPEG_READ_CALLBACK *pfnRead;
