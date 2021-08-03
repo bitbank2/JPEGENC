@@ -364,7 +364,7 @@ const unsigned char quant95_lum[64] PROGMEM =
     0x09, 0x07, 0x06, 0x06, 0x08, 0x0b, 0x08, 0x09,
     0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x06, 0x08, 0x0b,
     0x0c, 0x0b, 0x0a, 0x0c, 0x09, 0x0a, 0x0a, 0x0a };
-unsigned char quant95_color[64] PROGMEM =
+const unsigned char quant95_color[64] PROGMEM =
 { 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x05, 0x03,
     0x03, 0x05, 0x0a, 0x07, 0x06, 0x07, 0x0a, 0x0a,
     0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x0a,
@@ -1742,8 +1742,8 @@ int JPEGAddMCU(JPEGIMAGE *pJPEG, JPEGENCODE *pEncode, uint8_t *pPixels, int iPit
             pJPEG->iDCPred0 = 0; // reset the DC predictor
             pEncode->x = 0;
             pEncode->y += pEncode->cy;
-            if (pEncode->y >= pJPEG->iHeight) {
-                pJPEG->iDataSize = (int)(pJPEG->pc.pOut - pJPEG->pOutput); // DEBUG
+            if (pEncode->y >= pJPEG->iHeight && pJPEG->pOutput != NULL) {
+                pJPEG->iDataSize = (int)(pJPEG->pc.pOut - pJPEG->pOutput);
             }
         } else {
             pEncode->x += pEncode->cx;

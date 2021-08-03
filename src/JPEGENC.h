@@ -194,7 +194,7 @@ class JPEG
     int addMCU(JPEGENCODE *pEncode, uint8_t *pPixels, int iPitch);
     int getLastError();
 
-//  private:
+  private:
     JPEGIMAGE _jpeg;
 };
 #else
