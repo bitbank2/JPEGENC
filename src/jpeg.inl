@@ -779,7 +779,7 @@ void JPEGMakeHuffE(JPEGIMAGE *pJPEG)
 //
 int JPEGEncodeEnd(JPEGIMAGE *pJPEG)
 {
-    if (pJPEG->iError == 0)
+    if (pJPEG->iError == JPEG_SUCCESS)
     {
         if (pJPEG->pOutput == NULL) { // file I/O
             int iLen;
@@ -807,8 +807,9 @@ int JPEGEncodeBegin(JPEGIMAGE *pJPEG, JPEGENCODE *pEncode, int iWidth, int iHeig
     uint8_t *pBuf;
     int i;
     int iOffset = 0;
-    if (pEncode == NULL || pJPEG == NULL)
+    if (pEncode == NULL || pJPEG == NULL) {
         return JPEG_INVALID_PARAMETER;
+    }
     pJPEG->iDCPred0 = pJPEG->iDCPred1 = pJPEG->iDCPred2 = 0; // DC predictor values reset to 0
     pJPEG->iWidth = iWidth;
     pJPEG->iHeight = iHeight;
@@ -1056,7 +1057,7 @@ int JPEGEncodeBegin(JPEGIMAGE *pJPEG, JPEGENCODE *pEncode, int iWidth, int iHeig
     }
     JPEGFixQuantE(pJPEG); // reorder and scale quant table(s)
     JPEGMakeHuffE(pJPEG); // create the Huffman tables to encode
-
+    pJPEG->iError = JPEG_SUCCESS;
     return JPEG_SUCCESS;
 } /* JPEGEncodeBegin() */
 
@@ -1726,6 +1727,7 @@ int JPEGAddMCU(JPEGIMAGE *pJPEG, JPEGENCODE *pEncode, uint8_t *pPixels, int iPit
     
     if (pEncode->y >= pJPEG->iHeight) {
         // the image is already complete or was not initialized properly
+        pJPEG->iError = JPEG_INVALID_PARAMETER;
         return JPEG_INVALID_PARAMETER;
     }
     if (pJPEG->ucPixelType == JPEG_PIXEL_GRAYSCALE) {
@@ -1808,6 +1810,7 @@ int JPEGAddMCU(JPEGIMAGE *pJPEG, JPEGENCODE *pEncode, uint8_t *pPixels, int iPit
     }
     if (pJPEG->pc.pOut >= pJPEG->pHighWater) { // out of space or need to write incremental buffer
         if (pJPEG->pOutput) { // the user-supplied buffer is not big enough
+            pJPEG->iError = JPEG_NO_BUFFER;
             return JPEG_NO_BUFFER;
         } else { // write current block of data
             int iLen = (int)(pJPEG->pc.pOut - pJPEG->ucFileBuf);
