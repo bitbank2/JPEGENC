@@ -15,8 +15,8 @@ JPEG jpg; // static copy of JPEG encoder class
 
 // If MEM_TO_MEM is defined, the encoder will output directly to a single buffer that you
 // supply. If the buffer isn't large enough, it will exit before completing the image.
-// If not defined, it will write the output incrementally to file I/O callback functions
-// you provide.
+// If MEM_TO_MEM is not defined, it will write the output incrementally to file I/O callback functions
+// that you provide.
 //#define MEM_TO_MEM
 
 //
@@ -57,6 +57,7 @@ void myClose(JPEGFILE *pHandle)
 
 //
 // Read a Windows BMP file into memory
+// For this demo, the only supported files are 24 or 32-bits per pixel
 //
 uint8_t * ReadBMP(const char *fname, int *width, int *height, int *bpp, unsigned char *pPal)
 {
@@ -212,12 +213,16 @@ int main(int argc, const char * argv[]) {
             if (rc == JPEG_SUCCESS) {
                 iMCUCount = ((iWidth + jpe.cx-1)/ jpe.cx) * ((iHeight + jpe.cy-1) / jpe.cy);
                 for (i=0; i<iMCUCount && rc == JPEG_SUCCESS; i++) {
-                    // Send the same data for all MCUs (a simple diagonal line)
+                   // pass a pointer to the upper left corner of each MCU
+                   // the JPEGENCODE structure is updated by addMCU() after
+                   // each call
                     rc = jpg.addMCU(&jpe, &pBitmap[(jpe.x * iBytePP) + (jpe.y * iPitch)], iPitch);
                 }
                 iDataSize = jpg.close();
             }
 #ifdef MEM_TO_MEM
+            // We captured the compressed data in a buffer, so we need to
+            // explicitly write it into a file
             oHandle = fopen(argv[2], "w+b");
             if (oHandle) {
                 fwrite(pBuffer, 1, iDataSize, oHandle);
