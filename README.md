@@ -20,7 +20,7 @@ There are many open source libraries written for Linux that would be useful to r
 
 Feature summary:<br>
 ----------------<br>
-- Runs on any MCU with at least 6K of free RAM<br>
+- Runs on any MCU with at least 4K of free RAM<br>
 - No external dependencies (including malloc/free)<br>
 - Encode an image MCU by MCU<br>
 - Encode directly to your own buffer or a file with I/O callbacks you provide<br>
