@@ -162,7 +162,7 @@ int main(int argc, const char * argv[]) {
         rc = jpg.open(argv[1], myOpen, myClose, myRead, myWrite, mySeek);
 #endif
         if (rc == JPEG_SUCCESS) {
-            rc = jpg.encodeBegin(&jpe, iWidth, iHeight, JPEG_PIXEL_GRAYSCALE, JPEG_SUBSAMPLE_444, JPEG_QUALITY_BEST);
+            rc = jpg.encodeBegin(&jpe, iWidth, iHeight, JPEG_PIXEL_GRAYSCALE, JPEG_SUBSAMPLE_444, JPEG_Q_BEST);
             if (rc == JPEG_SUCCESS) {
                 memset(ucMCU, 0, sizeof(ucMCU));
                 for (i=0; i<8; i++)
@@ -209,7 +209,7 @@ int main(int argc, const char * argv[]) {
         rc = jpg.open(argv[2], myOpen, myClose, myRead, myWrite, mySeek);
 #endif
         if (rc == JPEG_SUCCESS) {
-            rc = jpg.encodeBegin(&jpe, iWidth, iHeight, ucPixelType, JPEG_SUBSAMPLE_420, JPEG_QUALITY_BEST);
+            rc = jpg.encodeBegin(&jpe, iWidth, iHeight, ucPixelType, JPEG_SUBSAMPLE_420, JPEG_Q_BEST);
             if (rc == JPEG_SUCCESS) {
                 iMCUCount = ((iWidth + jpe.cx-1)/ jpe.cx) * ((iHeight + jpe.cy-1) / jpe.cy);
                 for (i=0; i<iMCUCount && rc == JPEG_SUCCESS; i++) {

@@ -21,7 +21,7 @@
 //
 #ifndef __JPEGENC__
 #define __JPEGENC__
-#if defined( __MACH__ ) || defined( __LINUX__ ) || defined( __MCUXPRESSO )
+#if defined( MICROPY_PY_SENSOR ) || defined( __MACH__ ) || defined( __LINUX__ ) || defined( __MCUXPRESSO )
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
@@ -119,10 +119,10 @@ enum {
 };
 // Compression quality
 enum {
-    JPEG_QUALITY_BEST = 0,
-    JPEG_QUALITY_HIGH,
-    JPEG_QUALITY_MED,
-    JPEG_QUALITY_LOW
+    JPEG_Q_BEST = 0,
+    JPEG_Q_HIGH,
+    JPEG_Q_MED,
+    JPEG_Q_LOW
 };
 
 typedef struct jpeg_file_tag
@@ -162,7 +162,8 @@ typedef struct jpeg_image_tag
     PIL_CODE pc;
     int *huffdc[2];
     signed short sQuantTable[DCTSIZE*4];
-    signed short MCUs[6*DCTSIZE];
+    signed char MCUc[6*DCTSIZE]; // captured image data
+    signed short MCUs[DCTSIZE]; // final processed output
 //    uint8_t ucHuffACDCBuf[4096]; // moved to FLASH
     JPEG_READ_CALLBACK *pfnRead;
     JPEG_WRITE_CALLBACK *pfnWrite;
@@ -201,9 +202,9 @@ class JPEG
 #define JPEG_STATIC
 int JPEGOpenRAM(JPEGIMAGE *pJPEG, uint8_t *pData, int iDataSize);
 int JPEGOpenFile(JPEGIMAGE *pJPEG, const char *szFilename);
-int JPEGEncodeBegin(PNGIMAGE *pJPEG, int iWidth, int iHeight, uint8_t ucPixelType, uint8_t *pPalette, uint8_t ucCompLevel, uint8_t ucQFactor);
-void JPEGEncodeEnd(JPEGIMAGE *pJPEG);
-int JPEGAddMCU(JPEGIMAGE *uint8_t *pPixels);
+int JPEGEncodeBegin(JPEGIMAGE *pJPEG, JPEGENCODE *pEncode, int iWidth, int iHeight, uint8_t ucPixelType, uint8_t ucSubSample, uint8_t ucQFactor);
+int JPEGEncodeEnd(JPEGIMAGE *pJPEG);
+int JPEGAddMCU(JPEGIMAGE *pJPEG, JPEGENCODE *pEncode, uint8_t *pPixels, int iPitch);
 int JPEGGetLastError(JPEGIMAGE *pJPEG);
 #endif // __cplusplus
 

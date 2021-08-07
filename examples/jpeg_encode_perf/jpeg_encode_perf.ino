@@ -56,7 +56,7 @@ long lTime;
   if (rc == JPEG_SUCCESS) {
       Serial.println("JPEG file opened successfully");
       lTime = micros();
-      rc = jpg.encodeBegin(&jpe, iWidth, iHeight, JPEG_PIXEL_GRAYSCALE, JPEG_SUBSAMPLE_444, JPEG_QUALITY_HIGH);
+      rc = jpg.encodeBegin(&jpe, iWidth, iHeight, JPEG_PIXEL_GRAYSCALE, JPEG_SUBSAMPLE_444, JPEG_Q_HIGH);
       if (rc == JPEG_SUCCESS) {
           memset(ucMCU, 0, sizeof(ucMCU));
           

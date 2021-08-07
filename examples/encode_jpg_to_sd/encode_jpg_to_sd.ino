@@ -60,7 +60,7 @@ uint8_t ucMCU[64];
   rc = jpg.open("/TEST.JPG", myOpen, myClose, myRead, myWrite, mySeek);
   if (rc == JPEG_SUCCESS) {
       Serial.println("JPEG file opened successfully");
-      rc = jpg.encodeBegin(&jpe, iWidth, iHeight, JPEG_PIXEL_GRAYSCALE, JPEG_SUBSAMPLE_444, JPEG_QUALITY_HIGH);
+      rc = jpg.encodeBegin(&jpe, iWidth, iHeight, JPEG_PIXEL_GRAYSCALE, JPEG_SUBSAMPLE_444, JPEG_Q_HIGH);
       if (rc == JPEG_SUCCESS) {
           memset(ucMCU, 0, sizeof(ucMCU));
           
