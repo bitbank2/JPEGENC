@@ -1656,9 +1656,9 @@ void JPEGFDCT(signed char *pMCUSrc, signed short *pMCUDest)
         tmp10 = tmp4 + tmp5;
         tmp11 = tmp5 + tmp6;
         tmp12 = tmp6 + tmp7;
-        z5 = (((tmp10 - tmp12) * 98) >> 8); // 98 >>8 = 0.3826
-        z2 = z5 + ((tmp10 * 139) >> 8); // 139 >>8 = 0.541196
-        z4 = z5 + ((tmp12 * 334) >> 8); // 334 >>8 = 1.3065
+        z5 = ((tmp10 - tmp12) * 98); // 98 >>8 = 0.3826
+        z2 = ((z5 + tmp10 * 139) >> 8); // 139 >>8 = 0.541196
+        z4 = ((z5 + tmp12 * 334) >> 8); // 334 >>8 = 1.3065
         z3 = ((tmp11 * 181) >> 8);
         z11 = tmp7 + z3;
         z13 = tmp7 - z3;
@@ -1693,9 +1693,9 @@ void JPEGFDCT(signed char *pMCUSrc, signed short *pMCUDest)
         tmp10 = tmp4 + tmp5;
         tmp11 = tmp5 + tmp6;
         tmp12 = tmp6 + tmp7;
-        z5 = (((tmp10 - tmp12) * 98) >> 8);
-        z2 = z5 + ((tmp10 * 139) >> 8);
-        z4 = z5 + ((tmp12 * 334) >> 8);
+        z5 = ((tmp10 - tmp12) * 98);
+        z2 = ((z5 + tmp10 * 139) >> 8);
+        z4 = ((z5 + tmp12 * 334) >> 8);
         z3 = (tmp11 * 181) >> 8;
         z11 = tmp7 + z3;
         z13 = tmp7 - z3;
