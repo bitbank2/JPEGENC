@@ -668,13 +668,12 @@ void JPEGFixQuantE(JPEGIMAGE *pJPEG)
         {
             sTemp[i] = p[cZigZag[i]];
         }
-        memcpy(&pJPEG->sQuantTable[iTableOffset], sTemp, DCTSIZE*sizeof(short)); // copy back to original spot
         
         // Prescale for DCT multiplication
         p = (signed short *) &pJPEG->sQuantTable[iTableOffset];
         for (i = 0; i < DCTSIZE; i++)
         {
-            p[i] = (short) ((p[i] * iScaleBits[i]) >> 11);
+            p[i] = (short) ((sTemp[i] * iScaleBits[i]) >> 11);
         }
         // Create "inverted" values for quicker multiplication instead of division
         pus = (unsigned short *) &pJPEG->sQuantTable[iTableOffset];
