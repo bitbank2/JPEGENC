@@ -94,7 +94,7 @@ uint32_t ulAcc; // code accumulator (holds codes until at least 32-bits ready to
 #define WRITEMOTO16(p, o, val) {uint32_t l = val; p[o] = (unsigned char)(l >> 8); p[o+1] = (unsigned char)l;}
 
 // Error codes returned by getLastError()
-enum {
+typedef enum {
     JPEG_SUCCESS = 0,
     JPEG_INVALID_PARAMETER,
     JPEG_ENCODE_ERROR,
@@ -102,28 +102,28 @@ enum {
     JPEG_NO_BUFFER,
     JPEG_UNSUPPORTED_FEATURE,
     JPEG_INVALID_FILE
-};
+} JPGENC_ERR_CODE_t;
 // Subsample types
-enum {
+typedef enum {
     JPEG_SUBSAMPLE_444 = 0,
     JPEG_SUBSAMPLE_420
-};
+} JPGENC_SUBSAMPLE_t;
 
 // Pixel types
-enum {
+typedef enum {
     JPEG_PIXEL_GRAYSCALE = 0,
     JPEG_PIXEL_RGB565,
     JPEG_PIXEL_RGB888,
     JPEG_PIXEL_ARGB8888,
     JPEG_PIXEL_COUNT
-};
+} JPGENC_PIX_FMT_t;
 // Compression quality
-enum {
+typedef enum {
     JPEG_Q_BEST = 0,
     JPEG_Q_HIGH,
     JPEG_Q_MED,
     JPEG_Q_LOW
-};
+} JPGENC_QUALITY_t;
 
 typedef struct jpeg_file_tag
 {
