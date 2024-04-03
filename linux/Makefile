@@ -9,7 +9,7 @@ jpegenc: main.o JPEGENC.o
 main.o: main.cpp
 	$(CXX) $(CFLAGS) -c main.cpp
 
-JPEGENC.o: ../src/JPEGENC.cpp ../src/jpeg.inl ../src/JPEGENC.h
+JPEGENC.o: ../src/JPEGENC.cpp ../src/jpegenc.inl ../src/JPEGENC.h
 	$(CXX) $(CFLAGS) -c ../src/JPEGENC.cpp
 
 clean:

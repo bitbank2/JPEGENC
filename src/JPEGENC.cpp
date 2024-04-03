@@ -22,50 +22,50 @@
 #include "JPEGENC.h"
 
 // Include the C code which does the actual work
-#include "jpeg.inl"
+#include "jpegenc.inl"
 
 //
 // File (SD/MMC) based initialization
 //
-int JPEG::open(const char *szFilename, JPEG_OPEN_CALLBACK *pfnOpen, JPEG_CLOSE_CALLBACK *pfnClose, JPEG_READ_CALLBACK *pfnRead, JPEG_WRITE_CALLBACK *pfnWrite, JPEG_SEEK_CALLBACK *pfnSeek)
+int JPEGENC::open(const char *szFilename, JPEGE_OPEN_CALLBACK *pfnOpen, JPEGE_CLOSE_CALLBACK *pfnClose, JPEGE_READ_CALLBACK *pfnRead, JPEGE_WRITE_CALLBACK *pfnWrite, JPEGE_SEEK_CALLBACK *pfnSeek)
 {
-    memset(&_jpeg, 0, sizeof(JPEGIMAGE));
+    memset(&_jpeg, 0, sizeof(JPEGE_IMAGE));
     _jpeg.pfnRead = pfnRead;
     _jpeg.pfnWrite = pfnWrite;
     _jpeg.pfnSeek = pfnSeek;
     _jpeg.pfnOpen = pfnOpen;
     _jpeg.pfnClose = pfnClose;
     _jpeg.JPEGFile.fHandle = (*pfnOpen)(szFilename);
-    _jpeg.pHighWater = &_jpeg.ucFileBuf[JPEG_FILE_BUF_SIZE - 512];
+    _jpeg.pHighWater = &_jpeg.ucFileBuf[JPEGE_FILE_BUF_SIZE - 512];
     if (_jpeg.JPEGFile.fHandle == NULL) {
-        _jpeg.iError = JPEG_INVALID_FILE;
-       return JPEG_INVALID_FILE;
+        _jpeg.iError = JPEGE_INVALID_FILE;
+       return JPEGE_INVALID_FILE;
     }
-    return JPEG_SUCCESS;
+    return JPEGE_SUCCESS;
 
 } /* open() */
 
-int JPEG::open(uint8_t *pOutput, int iBufferSize)
+int JPEGENC::open(uint8_t *pOutput, int iBufferSize)
 {
-    memset(&_jpeg, 0, sizeof(JPEGIMAGE));
+    memset(&_jpeg, 0, sizeof(JPEGE_IMAGE));
     _jpeg.pOutput = pOutput;
     _jpeg.iBufferSize = iBufferSize;
     _jpeg.pHighWater = &pOutput[iBufferSize - 512];
 
-    return JPEG_SUCCESS;
+    return JPEGE_SUCCESS;
 } /* open() */
 
 //
 // return the last error (if any)
 //
-int JPEG::getLastError()
+int JPEGENC::getLastError()
 {
     return _jpeg.iError;
 } /* getLastError() */
 //
 // Close the file - not needed when decoding from memory
 //
-int JPEG::close()
+int JPEGENC::close()
 {
     JPEGEncodeEnd(&_jpeg);
     if (_jpeg.pfnClose)
@@ -73,12 +73,18 @@ int JPEG::close()
     return _jpeg.iDataSize;
 } /* close() */
 
-int JPEG::encodeBegin(JPEGENCODE *pEncode, int iWidth, int iHeight, uint8_t ucPixelType, uint8_t ucSubSample, uint8_t ucQFactor)
+int JPEGENC::encodeBegin(JPEGENCODE *pEncode, int iWidth, int iHeight, uint8_t ucPixelType, uint8_t ucSubSample, uint8_t ucQFactor)
 {
     return JPEGEncodeBegin(&_jpeg, pEncode, iWidth, iHeight, ucPixelType, ucSubSample, ucQFactor);
 } /* encodeBegin() */
 
-int JPEG::addMCU(JPEGENCODE *pEncode, uint8_t *pPixels, int iPitch)
+int JPEGENC::addMCU(JPEGENCODE *pEncode, uint8_t *pPixels, int iPitch)
 {
     return JPEGAddMCU(&_jpeg, pEncode, pPixels, iPitch);
 } /* addMCU() */
+
+int JPEGENC::addFrame(JPEGENCODE *pEncode, uint8_t *pPixels, int iPitch)
+{
+    return JPEGAddFrame(&_jpeg, pEncode, pPixels, iPitch);
+} /* addFrame() */
+

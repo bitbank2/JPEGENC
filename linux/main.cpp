@@ -11,7 +11,7 @@
 #include <stdint.h>
 
 #include "../src/JPEGENC.h"
-JPEG jpg; // static copy of JPEG encoder class
+JPEGENC jpg; // static copy of JPEG encoder class
 
 // If MEM_TO_MEM is defined, the encoder will output directly to a single buffer that you
 // supply. If the buffer isn't large enough, it will exit before completing the image.
@@ -24,19 +24,19 @@ JPEG jpg; // static copy of JPEG encoder class
 // that you provide to work on your particular setup
 // These are written for a Linux/POSIX file system
 //
-int32_t myWrite(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen)
+int32_t myWrite(JPEGE_FILE *pFile, uint8_t *pBuf, int32_t iLen)
 {
     FILE *ohandle = (FILE *)pFile->fHandle;
     return (int32_t)fwrite(pBuf, 1, iLen, ohandle);
 } /* myWrite() */
 
-int32_t myRead(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen)
+int32_t myRead(JPEGE_FILE *pFile, uint8_t *pBuf, int32_t iLen)
 {
     FILE *ohandle = (FILE *)pFile->fHandle;
     return (int32_t)fread(pBuf, 1, iLen, ohandle);
 } /* myRead() */
 
-int32_t mySeek(JPEGFILE *pFile, int32_t iPosition)
+int32_t mySeek(JPEGE_FILE *pFile, int32_t iPosition)
 {
     FILE *f = (FILE *)pFile->fHandle;
     fseek(f, iPosition, SEEK_SET);
@@ -49,7 +49,7 @@ void * myOpen(const char *szFilename)
     return fopen(szFilename, "w+b");
 } /* myOpen() */
 
-void myClose(JPEGFILE *pHandle)
+void myClose(JPEGE_FILE *pHandle)
 {
     FILE *f = (FILE *)pHandle->fHandle;
     fclose(f);
@@ -161,19 +161,20 @@ int main(int argc, const char * argv[]) {
 #else // use incremental File I/O
         rc = jpg.open(argv[1], myOpen, myClose, myRead, myWrite, mySeek);
 #endif
-        if (rc == JPEG_SUCCESS) {
-            rc = jpg.encodeBegin(&jpe, iWidth, iHeight, JPEG_PIXEL_GRAYSCALE, JPEG_SUBSAMPLE_444, JPEG_Q_BEST);
-            if (rc == JPEG_SUCCESS) {
+        if (rc == JPEGE_SUCCESS) {
+            rc = jpg.encodeBegin(&jpe, iWidth, iHeight, JPEGE_PIXEL_GRAYSCALE, JPEGE_SUBSAMPLE_444, JPEGE_Q_BEST);
+            if (rc == JPEGE_SUCCESS) {
                 memset(ucMCU, 0, sizeof(ucMCU));
                 for (i=0; i<8; i++)
                     ucMCU[i*8+i] = 192; // diagonal white line
                 
                 iMCUCount = ((iWidth + jpe.cx-1)/ jpe.cx) * ((iHeight + jpe.cy-1) / jpe.cy);
-                for (i=0; i<iMCUCount && rc == JPEG_SUCCESS; i++) {
+                for (i=0; i<iMCUCount && rc == JPEGE_SUCCESS; i++) {
                     // Send the same data for all MCUs (a simple diagonal line)
                     rc = jpg.addMCU(&jpe, ucMCU, 8);
                 }
                 iDataSize = jpg.close();
+                printf("Output JPEG file size = %d bytes\n", iDataSize);
             }
 #ifdef MEM_TO_MEM
             oHandle = fopen(argv[1], "w+b");
@@ -195,10 +196,10 @@ int main(int argc, const char * argv[]) {
         }
         if (iBpp == 24) {
             iBytePP = 3;
-            ucPixelType = JPEG_PIXEL_RGB888;
+            ucPixelType = JPEGE_PIXEL_RGB888;
         } else { // must be 32-bpp
             iBytePP = 4;
-            ucPixelType = JPEG_PIXEL_ARGB8888;
+            ucPixelType = JPEGE_PIXEL_ARGB8888;
         }
         iPitch = iBytePP * iWidth;
 #ifdef MEM_TO_MEM
@@ -208,16 +209,10 @@ int main(int argc, const char * argv[]) {
 #else // use incremental File I/O
         rc = jpg.open(argv[2], myOpen, myClose, myRead, myWrite, mySeek);
 #endif
-        if (rc == JPEG_SUCCESS) {
-            rc = jpg.encodeBegin(&jpe, iWidth, iHeight, ucPixelType, JPEG_SUBSAMPLE_420, JPEG_Q_BEST);
-            if (rc == JPEG_SUCCESS) {
-                iMCUCount = ((iWidth + jpe.cx-1)/ jpe.cx) * ((iHeight + jpe.cy-1) / jpe.cy);
-                for (i=0; i<iMCUCount && rc == JPEG_SUCCESS; i++) {
-                   // pass a pointer to the upper left corner of each MCU
-                   // the JPEGENCODE structure is updated by addMCU() after
-                   // each call
-                    rc = jpg.addMCU(&jpe, &pBitmap[(jpe.x * iBytePP) + (jpe.y * iPitch)], iPitch);
-                }
+        if (rc == JPEGE_SUCCESS) {
+            rc = jpg.encodeBegin(&jpe, iWidth, iHeight, ucPixelType, JPEGE_SUBSAMPLE_420, JPEGE_Q_BEST);
+            if (rc == JPEGE_SUCCESS) {
+                rc = jpg.addFrame(&jpe, pBitmap, iPitch);
                 iDataSize = jpg.close();
             }
 #ifdef MEM_TO_MEM
@@ -234,4 +229,4 @@ int main(int argc, const char * argv[]) {
         }
     }
     return 0;
-}
+} /* main() */

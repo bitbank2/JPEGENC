@@ -45,9 +45,11 @@
 #endif
 
 /* Defines and variables */
-#define JPEG_FILE_BUF_SIZE 2048
+#define JPEGE_FILE_BUF_SIZE 2048
 
+#ifndef DCTSIZE
 #define DCTSIZE 64
+#endif
 
 #if (INTPTR_MAX == INT64_MAX)
 #define REGISTER_WIDTH 64
@@ -94,56 +96,57 @@ uint32_t ulAcc; // code accumulator (holds codes until at least 32-bits ready to
 #define WRITEMOTO16(p, o, val) {uint32_t l = val; p[o] = (unsigned char)(l >> 8); p[o+1] = (unsigned char)l;}
 
 // Error codes returned by getLastError()
-typedef enum {
-    JPEG_SUCCESS = 0,
-    JPEG_INVALID_PARAMETER,
-    JPEG_ENCODE_ERROR,
-    JPEG_MEM_ERROR,
-    JPEG_NO_BUFFER,
-    JPEG_UNSUPPORTED_FEATURE,
-    JPEG_INVALID_FILE
-} JPGENC_ERR_CODE_t;
+enum {
+    JPEGE_SUCCESS = 0,
+    JPEGE_INVALID_PARAMETER,
+    JPEGE_ENCODE_ERROR,
+    JPEGE_MEM_ERROR,
+    JPEGE_NO_BUFFER,
+    JPEGE_UNSUPPORTED_FEATURE,
+    JPEGE_INVALID_FILE
+};
 // Subsample types
-typedef enum {
-    JPEG_SUBSAMPLE_444 = 0,
-    JPEG_SUBSAMPLE_420
-} JPGENC_SUBSAMPLE_t;
+enum {
+    JPEGE_SUBSAMPLE_444 = 0,
+    JPEGE_SUBSAMPLE_420
+};
 
 // Pixel types
-typedef enum {
-    JPEG_PIXEL_GRAYSCALE = 0,
-    JPEG_PIXEL_RGB565,
-    JPEG_PIXEL_RGB888,
-    JPEG_PIXEL_ARGB8888,
-    JPEG_PIXEL_COUNT
-} JPGENC_PIX_FMT_t;
+enum {
+    JPEGE_PIXEL_GRAYSCALE = 0,
+    JPEGE_PIXEL_RGB565,
+    JPEGE_PIXEL_RGB888,
+    JPEGE_PIXEL_ARGB8888,
+    JPEGE_PIXEL_YUV422,
+    JPEGE_PIXEL_COUNT
+};
 // Compression quality
-typedef enum {
-    JPEG_Q_BEST = 0,
-    JPEG_Q_HIGH,
-    JPEG_Q_MED,
-    JPEG_Q_LOW
-} JPGENC_QUALITY_t;
+enum {
+    JPEGE_Q_BEST = 0,
+    JPEGE_Q_HIGH,
+    JPEGE_Q_MED,
+    JPEGE_Q_LOW
+};
 
-typedef struct jpeg_file_tag
+typedef struct jpege_file_tag
 {
   int32_t iPos; // current file position
   int32_t iSize; // file size
   uint8_t *pData; // memory file pointer
   void * fHandle; // class pointer to File/SdFat or whatever you want
-} JPEGFILE;
+} JPEGE_FILE;
 
 // Callback function prototypes
-typedef int32_t (JPEG_READ_CALLBACK)(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen);
-typedef int32_t (JPEG_WRITE_CALLBACK)(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen);
-typedef int32_t (JPEG_SEEK_CALLBACK)(JPEGFILE *pFile, int32_t iPosition);
-typedef void * (JPEG_OPEN_CALLBACK)(const char *szFilename);
-typedef void (JPEG_CLOSE_CALLBACK)(JPEGFILE *pFile);
+typedef int32_t (JPEGE_READ_CALLBACK)(JPEGE_FILE *pFile, uint8_t *pBuf, int32_t iLen);
+typedef int32_t (JPEGE_WRITE_CALLBACK)(JPEGE_FILE *pFile, uint8_t *pBuf, int32_t iLen);
+typedef int32_t (JPEGE_SEEK_CALLBACK)(JPEGE_FILE *pFile, int32_t iPosition);
+typedef void * (JPEGE_OPEN_CALLBACK)(const char *szFilename);
+typedef void (JPEGE_CLOSE_CALLBACK)(JPEGE_FILE *pFile);
 
 //
 // our private structure to hold a JPEG image encode state
 //
-typedef struct jpeg_image_tag
+typedef struct jpege_image_tag
 {
     int iWidth, iHeight; // image size
     int iMCUWidth, iMCUHeight; // number of horizontal and vertical MCUs
@@ -152,8 +155,8 @@ typedef struct jpeg_image_tag
     uint8_t ucMemType;
     uint8_t *pOutput, *pHighWater;
     int iBufferSize; // output buffer size provided by caller
-    int iHeaderSize; // size of the PNG header
-    int iCompressedSize; // size of flate output
+    int iHeaderSize; // size of the JPEG header
+    int iCompressedSize; // size of compressed output
     int iDataSize; // total output file size
     int iPitch; // bytes per line
     int iError;
@@ -164,15 +167,14 @@ typedef struct jpeg_image_tag
     signed short sQuantTable[DCTSIZE*4];
     signed char MCUc[6*DCTSIZE]; // captured image data
     signed short MCUs[DCTSIZE]; // final processed output
-//    uint8_t ucHuffACDCBuf[4096]; // moved to FLASH
-    JPEG_READ_CALLBACK *pfnRead;
-    JPEG_WRITE_CALLBACK *pfnWrite;
-    JPEG_SEEK_CALLBACK *pfnSeek;
-    JPEG_OPEN_CALLBACK *pfnOpen;
-    JPEG_CLOSE_CALLBACK *pfnClose;
-    JPEGFILE JPEGFile;
-    uint8_t ucFileBuf[JPEG_FILE_BUF_SIZE]; // holds temp file data
-} JPEGIMAGE;
+    JPEGE_READ_CALLBACK *pfnRead;
+    JPEGE_WRITE_CALLBACK *pfnWrite;
+    JPEGE_SEEK_CALLBACK *pfnSeek;
+    JPEGE_OPEN_CALLBACK *pfnOpen;
+    JPEGE_CLOSE_CALLBACK *pfnClose;
+    JPEGE_FILE JPEGFile;
+    uint8_t ucFileBuf[JPEGE_FILE_BUF_SIZE]; // holds temp file data
+} JPEGE_IMAGE;
 
 typedef struct jpegencode_t
 {
@@ -183,29 +185,30 @@ typedef struct jpegencode_t
 #ifdef __cplusplus
 #define JPEG_STATIC static
 //
-// The PNG class wraps portable C code which does the actual work
+// The JPEGENC class wraps portable C code which does the actual work
 //
-class JPEG
+class JPEGENC
 {
   public:
-    int open(const char *szFilename, JPEG_OPEN_CALLBACK *pfnOpen, JPEG_CLOSE_CALLBACK *pfnClose, JPEG_READ_CALLBACK *pfnRead, JPEG_WRITE_CALLBACK *pfnWrite, JPEG_SEEK_CALLBACK *pfnSeek);
+    int open(const char *szFilename, JPEGE_OPEN_CALLBACK *pfnOpen, JPEGE_CLOSE_CALLBACK *pfnClose, JPEGE_READ_CALLBACK *pfnRead, JPEGE_WRITE_CALLBACK *pfnWrite, JPEGE_SEEK_CALLBACK *pfnSeek);
     int open(uint8_t *pOutput, int iBufferSize);
     int close();
     int encodeBegin(JPEGENCODE *pEncode, int iWidth, int iHeight, uint8_t ucPixelType, uint8_t ucSubSample, uint8_t ucQFactor);
     int addMCU(JPEGENCODE *pEncode, uint8_t *pPixels, int iPitch);
+    int addFrame(JPEGENCODE *pEncode, uint8_t *pPixels, int iPitch);
     int getLastError();
 
   private:
-    JPEGIMAGE _jpeg;
+    JPEGE_IMAGE _jpeg;
 };
 #else
 #define JPEG_STATIC
-int JPEGOpenRAM(JPEGIMAGE *pJPEG, uint8_t *pData, int iDataSize);
-int JPEGOpenFile(JPEGIMAGE *pJPEG, const char *szFilename);
-int JPEGEncodeBegin(JPEGIMAGE *pJPEG, JPEGENCODE *pEncode, int iWidth, int iHeight, uint8_t ucPixelType, uint8_t ucSubSample, uint8_t ucQFactor);
-int JPEGEncodeEnd(JPEGIMAGE *pJPEG);
-int JPEGAddMCU(JPEGIMAGE *pJPEG, JPEGENCODE *pEncode, uint8_t *pPixels, int iPitch);
-int JPEGGetLastError(JPEGIMAGE *pJPEG);
+int JPEGOpenRAM(JPEGE_IMAGE *pJPEG, uint8_t *pData, int iDataSize);
+int JPEGOpenFile(JPEGE_IMAGE *pJPEG, const char *szFilename);
+int JPEGEncodeBegin(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, int iWidth, int iHeight, uint8_t ucPixelType, uint8_t ucSubSample, uint8_t ucQFactor);
+int JPEGEncodeEnd(JPEGE_IMAGE *pJPEG);
+int JPEGAddMCU(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, uint8_t *pPixels, int iPitch);
+int JPEGGetLastError(JPEGE_IMAGE *pJPEG);
 #endif // __cplusplus
 
 // Due to unaligned memory causing an exception, we have to do these macros the slow way

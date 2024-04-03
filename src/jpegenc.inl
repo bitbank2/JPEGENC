@@ -647,7 +647,7 @@ const uint8_t hufftable[] PROGMEM = {
     0x10,0x00,0x10,0x00,0x10,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
     0x0a,0x00,0x0f,0x00,0x10,0x00,0x10,0x00,0x10,0x00,0x10,0x00,0x10,0x00,0x10,0x00,
     0x10,0x00,0x10,0x00,0x10,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
-void JPEGFixQuantE(JPEGIMAGE *pJPEG)
+void JPEGFixQuantE(JPEGE_IMAGE *pJPEG)
 {
     int iTable, iTableOffset;
     signed short sTemp[DCTSIZE];
@@ -668,12 +668,13 @@ void JPEGFixQuantE(JPEGIMAGE *pJPEG)
         {
             sTemp[i] = p[cZigZag[i]];
         }
+        memcpy(&pJPEG->sQuantTable[iTableOffset], sTemp, DCTSIZE*sizeof(short)); // copy back to original spot
         
         // Prescale for DCT multiplication
         p = (signed short *) &pJPEG->sQuantTable[iTableOffset];
         for (i = 0; i < DCTSIZE; i++)
         {
-            p[i] = (short) ((sTemp[i] * iScaleBits[i]) >> 11);
+            p[i] = (short) ((p[i] * iScaleBits[i]) >> 11);
         }
         // Create "inverted" values for quicker multiplication instead of division
         pus = (unsigned short *) &pJPEG->sQuantTable[iTableOffset];
@@ -689,7 +690,7 @@ void JPEGFixQuantE(JPEGIMAGE *pJPEG)
     } // for iTable
 } /* JPEGFixQuantE() */
 
-void JPEGMakeHuffE(JPEGIMAGE *pJPEG)
+void JPEGMakeHuffE(JPEGE_IMAGE *pJPEG)
 {
 #ifdef USE_RAM_FOR_TABLES
     int code, iLen, iTable;
@@ -776,9 +777,9 @@ void JPEGMakeHuffE(JPEGIMAGE *pJPEG)
 //
 // Finish the file
 //
-int JPEGEncodeEnd(JPEGIMAGE *pJPEG)
+int JPEGEncodeEnd(JPEGE_IMAGE *pJPEG)
 {
-    if (pJPEG->iError == JPEG_SUCCESS)
+    if (pJPEG->iError == JPEGE_SUCCESS)
     {
         if (pJPEG->pOutput == NULL) { // file I/O
             int iLen;
@@ -801,13 +802,13 @@ int JPEGEncodeEnd(JPEGIMAGE *pJPEG)
 //
 // Initialize the encoder
 //
-int JPEGEncodeBegin(JPEGIMAGE *pJPEG, JPEGENCODE *pEncode, int iWidth, int iHeight, uint8_t ucPixelType, uint8_t ucSubSample, uint8_t ucQFactor)
+int JPEGEncodeBegin(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, int iWidth, int iHeight, uint8_t ucPixelType, uint8_t ucSubSample, uint8_t ucQFactor)
 {
     uint8_t *pBuf;
     int i;
     int iOffset = 0;
     if (pEncode == NULL || pJPEG == NULL) {
-        return JPEG_INVALID_PARAMETER;
+        return JPEGE_INVALID_PARAMETER;
     }
     pJPEG->iDCPred0 = pJPEG->iDCPred1 = pJPEG->iDCPred2 = 0; // DC predictor values reset to 0
     pJPEG->iWidth = iWidth;
@@ -815,7 +816,7 @@ int JPEGEncodeBegin(JPEGIMAGE *pJPEG, JPEGENCODE *pEncode, int iWidth, int iHeig
     pJPEG->ucPixelType = ucPixelType;
     pJPEG->ucSubSample = ucSubSample;
     pEncode->x = pEncode->y = 0; // starting point
-    if (ucSubSample == JPEG_SUBSAMPLE_444) {
+    if (ucSubSample == JPEGE_SUBSAMPLE_444) {
         pEncode->cx = pEncode->cy = 8;
     } else {
         pEncode->cx = pEncode->cy = 16; // MCU size
@@ -832,7 +833,7 @@ int JPEGEncodeBegin(JPEGIMAGE *pJPEG, JPEGENCODE *pEncode, int iWidth, int iHeig
         pBuf = pJPEG->ucFileBuf;
     }
     // Write the JPEG header
-    if (pJPEG->ucPixelType == JPEG_PIXEL_GRAYSCALE)
+    if (pJPEG->ucPixelType == JPEGE_PIXEL_GRAYSCALE)
         pJPEG->ucNumComponents = 1;
     else
         pJPEG->ucNumComponents = 3;
@@ -861,16 +862,16 @@ int JPEGEncodeBegin(JPEGIMAGE *pJPEG, JPEGENCODE *pEncode, int iWidth, int iHeig
         switch (ucQFactor) // adjust table depending on quality factor
         {
             default:
-            case JPEG_Q_BEST: // best quality, divide by 4
+            case JPEGE_Q_BEST: // best quality, divide by 4
                 pBuf[iOffset++] = quant_lum[i] >> 2;
                 break;
-            case JPEG_Q_HIGH: // high quality, divide by 2
+            case JPEGE_Q_HIGH: // high quality, divide by 2
                 pBuf[iOffset++] = quant_lum[i] >> 1;
                 break;
-            case JPEG_Q_MED: // medium quality factor, use values unchanged
+            case JPEGE_Q_MED: // medium quality factor, use values unchanged
                 pBuf[iOffset++] = quant_lum[i];
                 break;
-            case JPEG_Q_LOW: // low quality, use values * 2
+            case JPEGE_Q_LOW: // low quality, use values * 2
                 pBuf[iOffset++] = quant_lum[i] << 1;
                 break;
 //            case 4: // ridiculously high quality
@@ -878,7 +879,7 @@ int JPEGEncodeBegin(JPEGIMAGE *pJPEG, JPEGENCODE *pEncode, int iWidth, int iHeig
 //                break;
         }
     }
-    if (pJPEG->ucPixelType != JPEG_PIXEL_GRAYSCALE) // add color quant tables
+    if (pJPEG->ucPixelType != JPEGE_PIXEL_GRAYSCALE) // add color quant tables
     {
         WRITEMOTO16(pBuf, iOffset, 0xffdb); // quantization table
         iOffset += 2;
@@ -889,16 +890,16 @@ int JPEGEncodeBegin(JPEGIMAGE *pJPEG, JPEGENCODE *pEncode, int iWidth, int iHeig
         {
             switch (ucQFactor) // adjust table depending on quality factor
             {
-                case JPEG_Q_BEST: // best quality, divide by 4
+                case JPEGE_Q_BEST: // best quality, divide by 4
                     pBuf[iOffset++] = quant_color[i] >> 2;
                     break;
-                case JPEG_Q_HIGH: // high quality, divide by 2
+                case JPEGE_Q_HIGH: // high quality, divide by 2
                     pBuf[iOffset++] = quant_color[i] >> 1;
                     break;
-                case JPEG_Q_MED: // medium quality factor, use values unchanged
+                case JPEGE_Q_MED: // medium quality factor, use values unchanged
                     pBuf[iOffset++] = quant_color[i];
                     break;
-                case JPEG_Q_LOW: // low quality, use values * 2
+                case JPEGE_Q_LOW: // low quality, use values * 2
                     pBuf[iOffset++] = quant_color[i] << 1;
                     break;
 //                case 4: // ridiculously high quality
@@ -909,7 +910,7 @@ int JPEGEncodeBegin(JPEGIMAGE *pJPEG, JPEGENCODE *pEncode, int iWidth, int iHeig
     }
     // store the restart interval
     // use an interval of one MCU row
-    if (pJPEG->ucPixelType != JPEG_PIXEL_GRAYSCALE && pJPEG->ucSubSample == JPEG_SUBSAMPLE_420)
+    if (pJPEG->ucPixelType != JPEGE_PIXEL_GRAYSCALE && pJPEG->ucSubSample == JPEGE_SUBSAMPLE_420)
         i = (pJPEG->iWidth + 15) / 16; // number of MCUs in a row
     else
         i = (pJPEG->iWidth + 7) / 8;
@@ -923,7 +924,7 @@ int JPEGEncodeBegin(JPEGIMAGE *pJPEG, JPEGENCODE *pEncode, int iWidth, int iHeig
     // store the frame header
     WRITEMOTO16(pBuf, iOffset, 0xffc0); // SOF0 marker
     iOffset += 2;
-    if (pJPEG->ucPixelType == JPEG_PIXEL_GRAYSCALE)
+    if (pJPEG->ucPixelType == JPEGE_PIXEL_GRAYSCALE)
     {
         pBuf[iOffset++] = 0;
         pBuf[iOffset++] = 11; // length = 11
@@ -948,7 +949,7 @@ int JPEGEncodeBegin(JPEGIMAGE *pJPEG, JPEGENCODE *pEncode, int iWidth, int iHeig
         iOffset += 2;
         pBuf[iOffset++] = 3; // number of components = 3 (Ycc)
         pBuf[iOffset++] = 0; // component number 0 (Y)
-        if (pJPEG->ucSubSample == JPEG_SUBSAMPLE_420)
+        if (pJPEG->ucSubSample == JPEGE_SUBSAMPLE_420)
         {
             WRITEMOTO16(pBuf, iOffset, 0x2200); // 2:1 subsampling and quant table selector
         }
@@ -980,7 +981,7 @@ int JPEGEncodeBegin(JPEGIMAGE *pJPEG, JPEGENCODE *pEncode, int iWidth, int iHeig
     pBuf[iOffset++] = 0x10; // table class = 1 (AC), id = 0
     memcpy(&pBuf[iOffset], huffl_ac, 178); // copy AC table
     iOffset += 178;
-    if (pJPEG->ucPixelType != JPEG_PIXEL_GRAYSCALE) // define a second set of tables for color
+    if (pJPEG->ucPixelType != JPEGE_PIXEL_GRAYSCALE) // define a second set of tables for color
     {
         WRITEMOTO16(pBuf, iOffset, 0xffc4); // Huffman DC table
         iOffset += 2;
@@ -1001,7 +1002,7 @@ int JPEGEncodeBegin(JPEGIMAGE *pJPEG, JPEGENCODE *pEncode, int iWidth, int iHeig
     // Define the start of scan header (SOS)
     WRITEMOTO16(pBuf, iOffset, 0xffda); // SOS
     iOffset += 2;
-    if (pJPEG->ucPixelType == JPEG_PIXEL_GRAYSCALE)
+    if (pJPEG->ucPixelType == JPEGE_PIXEL_GRAYSCALE)
     {
         WRITEMOTO16(pBuf, iOffset, 0x8); // Table length = 8
         iOffset += 2;
@@ -1032,19 +1033,19 @@ int JPEGEncodeBegin(JPEGIMAGE *pJPEG, JPEGENCODE *pEncode, int iWidth, int iHeig
     {
         switch (ucQFactor)
         {
-            case JPEG_Q_BEST:
+            case JPEGE_Q_BEST:
                 pJPEG->sQuantTable[i] = quant_lum[i] >> 2;
                 pJPEG->sQuantTable[i + 64] = quant_color[i] >> 2;
                 break;
-            case JPEG_Q_HIGH:
+            case JPEGE_Q_HIGH:
                 pJPEG->sQuantTable[i] = (quant_lum[i] >> 1);
                 pJPEG->sQuantTable[i + 64] = (quant_color[i] >> 1);
                 break;
-            case JPEG_Q_MED:
+            case JPEGE_Q_MED:
                 pJPEG->sQuantTable[i] = quant_lum[i];
                 pJPEG->sQuantTable[i + 64] = quant_color[i];
                 break;
-            case JPEG_Q_LOW:
+            case JPEGE_Q_LOW:
                 pJPEG->sQuantTable[i] = (quant_lum[i] << 1);
                 pJPEG->sQuantTable[i + 64] = (quant_color[i] << 1);
                 break;
@@ -1056,11 +1057,11 @@ int JPEGEncodeBegin(JPEGIMAGE *pJPEG, JPEGENCODE *pEncode, int iWidth, int iHeig
     }
     JPEGFixQuantE(pJPEG); // reorder and scale quant table(s)
     JPEGMakeHuffE(pJPEG); // create the Huffman tables to encode
-    pJPEG->iError = JPEG_SUCCESS;
-    return JPEG_SUCCESS;
+    pJPEG->iError = JPEGE_SUCCESS;
+    return JPEGE_SUCCESS;
 } /* JPEGEncodeBegin() */
 
-int JPEGQuantize(JPEGIMAGE *pJPEG, signed short *pMCUSrc, int iTable)
+int JPEGQuantize(JPEGE_IMAGE *pJPEG, signed short *pMCUSrc, int iTable)
 {
     signed int d, sQ1, sQ2, sum;
     int i;
@@ -1106,7 +1107,7 @@ int JPEGQuantize(JPEGIMAGE *pJPEG, signed short *pMCUSrc, int iTable)
     return (sum == 0); // if the last half of the quantized results was 0, call it 'sparse'
 } /* JPEGQuantize() */
 
-int JPEGEncodeMCU(int iDCTable, JPEGIMAGE *pJPEG, signed short *pMCUData, int iDCPred, int bSparse)
+int JPEGEncodeMCU(int iDCTable, JPEGE_IMAGE *pJPEG, signed short *pMCUData, int iDCPred, int bSparse)
 {
     //int iOff, iBitnum; // faster access
     unsigned char cMagnitude;
@@ -1446,15 +1447,85 @@ void JPEGSample32(unsigned char *pSrc, signed char *pMCU, int lsize, int cx, int
 
 } /* JPEGSample32() */
 
-void JPEGGetMCU22(unsigned char *pImage, JPEGIMAGE *pPage, int iPitch)
+//
+// U0 Y0 V0 Y1 U2 Y2 V2 Y3...
+// The bytes coming from the GC0308 are reversed, 0=Y0, 1=U0, 2=Y1, etc
+// assumes that the YUV422 will be converted to 4:2:0 subsampling
+// YUV422 is horizontally subsampled; this code takes the average of each
+// vertical pair of Cb/Cr and creates 4:2:0 from it
+//
+void JPEGSubSampleYUV422(uint8_t *pImage, int8_t *pMCUData, int iPitch)
+{
+int x, y;
+uint8_t *pY0, *pY1, *pY2, *pY3;
+uint8_t *pCr, *pCb;
+uint8_t *s = pImage;
+int iCr, iCb;
+uint32_t *pU32;
+
+  // output bins for YCbCr 
+    pY0 = (uint8_t *)pMCUData; pY1 = (uint8_t *)&pMCUData[64*1];
+    pY2 = (uint8_t *)&pMCUData[64*2]; pY3 = (uint8_t *)&pMCUData[64*3];
+    pCr = (uint8_t *)&pMCUData[64*4]; pCb = (uint8_t *)&pMCUData[64*5];
+
+  // subsample the UV vertically to get 4:2:0 from 4:2:2
+    for (y=0; y<4; y ++) { // do 4 quadrants of 2x2 blocks of pixels at a time
+        for (x=0; x<4; x++) {
+            pY0[0] = s[0]; pY0[1] = s[2]; // top left
+            pY0[8] = s[iPitch]; pY0[9] = s[iPitch+2];
+
+            pY1[0] = s[16]; pY1[1] = s[18]; // top right
+            pY1[8] = s[iPitch+16]; pY1[9] = s[iPitch+18];
+
+            pY2[0] = s[(iPitch*8)+0]; pY2[1] = s[(iPitch*8)+2]; // bottom left
+            pY2[8] = s[(iPitch*9)+0]; pY2[9] = s[(iPitch*9)+2];
+
+            pY3[0] = s[(iPitch*8)+16]; pY3[1] = s[(iPitch*8)+18]; // bottom right
+            pY3[8] = s[(iPitch*9)+16]; pY3[9] = s[(iPitch*9)+18];
+
+            iCr = (s[1] + s[iPitch+1] + 1)/2; // subsample vertically
+            iCb = (s[3] + s[iPitch+3] + 1)/2;
+            pCr[0] = (int8_t)(iCr);
+            pCb[0] = (int8_t)(iCb);
+            iCr = (s[17] + s[iPitch+17] + 1)/2; // subsample vertically
+            iCb = (s[19] + s[iPitch+19] + 1)/2;
+            pCr[4] = (int8_t)(iCr);
+            pCb[4] = (int8_t)(iCb);
+
+            iCr = (s[(iPitch*8)+1] + s[(iPitch*9)+1] + 1)/2; // subsample vertically
+            iCb = (s[(iPitch*8)+3] + s[(iPitch*9)+3] + 1)/2;
+            pCr[32] = (int8_t)(iCr);
+            pCb[32] = (int8_t)(iCb);
+            iCr = (s[(iPitch*8)+17] + s[(iPitch*9)+17] + 1)/2; // subsample vertically
+            iCb = (s[(iPitch*8)+19] + s[(iPitch*9)+19] + 1)/2;
+            pCr[36] = (int8_t)(iCr);
+            pCb[36] = (int8_t)(iCb);
+
+            pCr++; pCb++;
+            pY0 += 2; pY1 += 2; pY2 += 2; pY3 += 2;
+            s += 4;
+        } // for x
+        pCr += 4; pCb += 4;
+        pY0 += 8; pY1 += 8; pY2 += 8; pY3 += 8;
+        s += (iPitch*2) - 16;
+    } // for y
+    pU32 = (uint32_t *)pMCUData;
+    // all of the YUV values need to be adjusted +/-128, so XOR with 0x80
+    for (x = 0; x<(6*16);x++) {
+        pU32[0] ^= 0x80808080;
+        pU32++;
+    }
+} /* JPEGSubSampleYUV422() */
+
+void JPEGGetMCU22(unsigned char *pImage, JPEGE_IMAGE *pPage, int iPitch)
 {
     int cx, cy, width, height;
     signed char *pMCUData = pPage->MCUc;
-//    if (pPage->ucPixelType == JPEG_PIXEL_RGB565)
+//    if (pPage->ucPixelType == JPEGE_PIXEL_RGB565)
 //        pSrc = pImage + x*16*2 + (y * 16 * lsize);
-//    else if (pPage->ucPixelType == JPEG_PIXEL_RGB888)
+//    else if (pPage->ucPixelType == JPEGE_PIXEL_RGB888)
 //        pSrc = pImage + x*16*3 + (y * 16 * lsize);
-//    else if (pPage->ucPixelType == JPEG_PIXEL_ARGB8888)
+//    else if (pPage->ucPixelType == JPEGE_PIXEL_ARGB8888)
 //        pSrc = pImage + x*16*4 + (y * 16 * lsize);
 //    else
 //        return; // invalid bit depth
@@ -1475,7 +1546,11 @@ void JPEGGetMCU22(unsigned char *pImage, JPEGIMAGE *pPage, int iPitch)
 //        cy = 8;
 //    if (cy != 8 || cx != 8) // for edge MCUs, make sure all unused slots are 0
 //        memset(pMCUData, 0, 6*64*sizeof(short));
-    if (pPage->ucPixelType == JPEG_PIXEL_RGB565)
+    if (pPage->ucPixelType == JPEGE_PIXEL_YUV422) // U0 Y0 V0 Y1 U2 Y2 V2 Y3
+    {
+        JPEGSubSampleYUV422(pImage, pMCUData, iPitch);
+    }
+    else if (pPage->ucPixelType == JPEGE_PIXEL_RGB565)
     {
         // upper left
         JPEGSubSample16(pImage, pMCUData, &pMCUData[DCTSIZE*4], &pMCUData[DCTSIZE*5], iPitch, cx, cy);
@@ -1491,7 +1566,7 @@ void JPEGGetMCU22(unsigned char *pImage, JPEGIMAGE *pPage, int iPitch)
                 JPEGSubSample16(pImage+8*iPitch + 8*2, &pMCUData[DCTSIZE*3], &pMCUData[36+DCTSIZE*4], &pMCUData[36+DCTSIZE*5], iPitch, width - 8, height - 8);
         }
     }
-    else if (pPage->ucPixelType == JPEG_PIXEL_RGB888)
+    else if (pPage->ucPixelType == JPEGE_PIXEL_RGB888)
     {
         // upper left
         JPEGSubSample24(pImage, pMCUData, &pMCUData[DCTSIZE*4], &pMCUData[DCTSIZE*5], iPitch, cx, cy);
@@ -1507,7 +1582,7 @@ void JPEGGetMCU22(unsigned char *pImage, JPEGIMAGE *pPage, int iPitch)
                 JPEGSubSample24(pImage+8*iPitch + 8*3, &pMCUData[DCTSIZE*3], &pMCUData[36+DCTSIZE*4], &pMCUData[36+DCTSIZE*5], iPitch, width - 8, height - 8);
         }
     }
-    else if (pPage->ucPixelType == JPEG_PIXEL_ARGB8888)
+    else if (pPage->ucPixelType == JPEGE_PIXEL_ARGB8888)
     {
         // upper left
         JPEGSubSample32(pImage, pMCUData, &pMCUData[DCTSIZE*4], &pMCUData[DCTSIZE*5], iPitch, cx, cy);
@@ -1599,7 +1674,7 @@ void JPEGSample24(unsigned char *pSrc, signed char *pMCU, int lsize, int cx, int
     
 } /* JPEGSample24() */
 
-void JPEGGetMCU11(unsigned char *pImage, JPEGIMAGE *pPage, int iPitch)
+void JPEGGetMCU11(unsigned char *pImage, JPEGE_IMAGE *pPage, int iPitch)
 {
     int cx, cy;
     signed char *pMCUData = pPage->MCUc;
@@ -1613,9 +1688,9 @@ void JPEGGetMCU11(unsigned char *pImage, JPEGIMAGE *pPage, int iPitch)
         cy = 8;
 //    if (cy != 8 || cx != 8)
 //        memset(pMCUData, 0, 3*64*sizeof(short)); // make sure unused pixels are 0
-    if (pPage->ucPixelType == JPEG_PIXEL_RGB888)
+    if (pPage->ucPixelType == JPEGE_PIXEL_RGB888)
         JPEGSample24(pImage, pMCUData, iPitch, cx, cy);
-    else if (pPage->ucPixelType == JPEG_PIXEL_RGB565)
+    else if (pPage->ucPixelType == JPEGE_PIXEL_RGB565)
         JPEGSample16(pImage, pMCUData, iPitch, cx, cy);
     else // must be 32-bpp
         JPEGSample32(pImage, pMCUData, iPitch, cx, cy);
@@ -1721,16 +1796,16 @@ void FlushCode(PIL_CODE *pPC)
     pPC->iLen = 0;
 } /* FlushCode() */
 
-int JPEGAddMCU(JPEGIMAGE *pJPEG, JPEGENCODE *pEncode, uint8_t *pPixels, int iPitch)
+int JPEGAddMCU(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, uint8_t *pPixels, int iPitch)
 {
     int bSparse;
     
     if (pEncode->y >= pJPEG->iHeight) {
         // the image is already complete or was not initialized properly
-        pJPEG->iError = JPEG_INVALID_PARAMETER;
-        return JPEG_INVALID_PARAMETER;
+        pJPEG->iError = JPEGE_INVALID_PARAMETER;
+        return JPEGE_INVALID_PARAMETER;
     }
-    if (pJPEG->ucPixelType == JPEG_PIXEL_GRAYSCALE) {
+    if (pJPEG->ucPixelType == JPEGE_PIXEL_GRAYSCALE) {
         JPEGGetMCU(pPixels, iPitch, pJPEG->MCUc);
         JPEGFDCT(pJPEG->MCUc, pJPEG->MCUs);
         bSparse = JPEGQuantize(pJPEG, pJPEG->MCUs, 0);
@@ -1751,7 +1826,7 @@ int JPEGAddMCU(JPEGIMAGE *pJPEG, JPEGENCODE *pEncode, uint8_t *pPixels, int iPit
             pEncode->x += pEncode->cx;
         } // grayscale
     } else { // color
-        if (pJPEG->ucSubSample == JPEG_SUBSAMPLE_444) {
+        if (pJPEG->ucSubSample == JPEGE_SUBSAMPLE_444) {
             JPEGGetMCU11(pPixels, pJPEG, iPitch);
             JPEGFDCT(&pJPEG->MCUc[0*DCTSIZE], pJPEG->MCUs);
             // Y
@@ -1804,8 +1879,8 @@ int JPEGAddMCU(JPEGIMAGE *pJPEG, JPEGENCODE *pEncode, uint8_t *pPixels, int iPit
     }
     if (pJPEG->pc.pOut >= pJPEG->pHighWater) { // out of space or need to write incremental buffer
         if (pJPEG->pOutput) { // the user-supplied buffer is not big enough
-            pJPEG->iError = JPEG_NO_BUFFER;
-            return JPEG_NO_BUFFER;
+            pJPEG->iError = JPEGE_NO_BUFFER;
+            return JPEGE_NO_BUFFER;
         } else { // write current block of data
             int iLen = (int)(pJPEG->pc.pOut - pJPEG->ucFileBuf);
             pJPEG->pfnWrite(&pJPEG->JPEGFile, pJPEG->ucFileBuf, iLen);
@@ -1813,5 +1888,40 @@ int JPEGAddMCU(JPEGIMAGE *pJPEG, JPEGENCODE *pEncode, uint8_t *pPixels, int iPit
             pJPEG->pc.pOut = pJPEG->ucFileBuf;
         }
     }
-    return JPEG_SUCCESS;
+    return JPEGE_SUCCESS;
 } /* JPEGAddMCU() */
+
+int JPEGAddFrame(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, uint8_t *pPixels, int iPitch)
+{
+int x, y;
+uint8_t *s;
+int rc = JPEGE_SUCCESS;
+int iBPMCU;
+
+    iBPMCU = pEncode->cx;
+    switch (pJPEG->ucPixelType) {
+        case JPEGE_PIXEL_GRAYSCALE:
+           break; // 1 byte per pixel
+        case JPEGE_PIXEL_RGB565:
+           iBPMCU *= 2;
+           break;
+        case JPEGE_PIXEL_RGB888:
+           iBPMCU *= 3;
+           break;
+        case JPEGE_PIXEL_ARGB8888:
+           iBPMCU *= 4;
+           break;
+        case JPEGE_PIXEL_YUV422:
+           iBPMCU *= 2; // average 2 bytes per pixel
+           break;
+    }
+    for (y = 0; y < pJPEG->iMCUHeight && rc == JPEGE_SUCCESS; y++) {
+        s = &pPixels[y * pEncode->cy * iPitch];
+        for (x = 0; x<pJPEG->iMCUWidth && rc == JPEGE_SUCCESS; x++) {
+            rc = JPEGAddMCU(pJPEG, pEncode, s, iPitch);
+            s += iBPMCU;
+        } // for x
+    } // for y
+    return rc;
+} /* JPEGAddFrame() */
+
