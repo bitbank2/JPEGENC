@@ -8,7 +8,7 @@
 #include <JPEGENC.h>
 #include <SD.h>
 
-JPEG jpg;
+JPEGENC jpg;
 static File myfile;
 
 //
@@ -20,21 +20,21 @@ void * myOpen(const char *filename) {
   myfile = SD.open(filename, FILE_WRITE);
   return (void *)&myfile;
 }
-void myClose(JPEGFILE *p) {
+void myClose(JPEGE_FILE *p) {
   File *f = (File *)p->fHandle;
   if (f) f->close();
 }
-int32_t myRead(JPEGFILE *p, uint8_t *buffer, int32_t length) {
+int32_t myRead(JPEGE_FILE *p, uint8_t *buffer, int32_t length) {
   File *f = (File *)p->fHandle;
   return f->read(buffer, length);
 }
 
-int32_t myWrite(JPEGFILE *p, uint8_t *buffer, int32_t length) {
+int32_t myWrite(JPEGE_FILE *p, uint8_t *buffer, int32_t length) {
   File *f = (File *)p->fHandle;
   return f->write(buffer, length);
 }
 
-int32_t mySeek(JPEGFILE *p, int32_t position) {
+int32_t mySeek(JPEGE_FILE *p, int32_t position) {
   File *f = (File *)p->fHandle;
   return f->seek(position);
 }
@@ -58,14 +58,14 @@ JPEGENCODE jpe;
 uint8_t ucMCU[64];
 
   rc = jpg.open("/TEST.JPG", myOpen, myClose, myRead, myWrite, mySeek);
-  if (rc == JPEG_SUCCESS) {
+  if (rc == JPEGE_SUCCESS) {
       Serial.println("JPEG file opened successfully");
-      rc = jpg.encodeBegin(&jpe, iWidth, iHeight, JPEG_PIXEL_GRAYSCALE, JPEG_SUBSAMPLE_444, JPEG_Q_HIGH);
-      if (rc == JPEG_SUCCESS) {
+      rc = jpg.encodeBegin(&jpe, iWidth, iHeight, JPEGE_PIXEL_GRAYSCALE, JPEGE_SUBSAMPLE_444, JPEGE_Q_HIGH);
+      if (rc == JPEGE_SUCCESS) {
           memset(ucMCU, 0, sizeof(ucMCU));
           
           iMCUCount = ((iWidth + jpe.cx-1)/ jpe.cx) * ((iHeight + jpe.cy-1) / jpe.cy);
-          for (i=0; i<iMCUCount && rc == JPEG_SUCCESS; i++) {
+          for (i=0; i<iMCUCount && rc == JPEGE_SUCCESS; i++) {
               // Send two types of MCUs (a simple diagonal line, and a blank box)
               if (i & 1) { // odd MCUs
                 for (int j=0; j<8; j++)
