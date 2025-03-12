@@ -29,6 +29,9 @@
 //
 int JPEGENC::open(const char *szFilename, JPEGE_OPEN_CALLBACK *pfnOpen, JPEGE_CLOSE_CALLBACK *pfnClose, JPEGE_READ_CALLBACK *pfnRead, JPEGE_WRITE_CALLBACK *pfnWrite, JPEGE_SEEK_CALLBACK *pfnSeek)
 {
+    if (szFilename == NULL || pfnOpen == NULL || pfnClose == NULL || pfnRead == NULL || pfnWrite == NULL || pfnSeek == NULL) {
+        return JPEGE_INVALID_PARAMETER;
+    }
     memset(&_jpeg, 0, sizeof(JPEGE_IMAGE));
     _jpeg.pfnRead = pfnRead;
     _jpeg.pfnWrite = pfnWrite;
@@ -47,6 +50,7 @@ int JPEGENC::open(const char *szFilename, JPEGE_OPEN_CALLBACK *pfnOpen, JPEGE_CL
 
 int JPEGENC::open(uint8_t *pOutput, int iBufferSize)
 {
+    if (!pOutput || iBufferSize < 1024) return JPEGE_INVALID_PARAMETER;
     memset(&_jpeg, 0, sizeof(JPEGE_IMAGE));
     _jpeg.pOutput = pOutput;
     _jpeg.iBufferSize = iBufferSize;

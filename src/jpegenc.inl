@@ -810,6 +810,12 @@ int JPEGEncodeBegin(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, int iWidth, int iHe
     if (pEncode == NULL || pJPEG == NULL) {
         return JPEGE_INVALID_PARAMETER;
     }
+    if (iWidth < 1 || iHeight < 1) {
+        return JPEGE_INVALID_PARAMETER;
+    }
+    if (ucPixelType >= JPEGE_PIXEL_COUNT || (ucSubSample != JPEGE_SUBSAMPLE_444 && ucSubSample != JPEGE_SUBSAMPLE_420) || ucQFactor > JPEGE_Q_LOW) {
+        return JPEGE_INVALID_PARAMETER;
+    }
     pJPEG->iDCPred0 = pJPEG->iDCPred1 = pJPEG->iDCPred2 = 0; // DC predictor values reset to 0
     pJPEG->iWidth = iWidth;
     pJPEG->iHeight = iHeight;
