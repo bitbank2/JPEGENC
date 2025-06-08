@@ -1,8 +1,8 @@
+// SPDX-FileCopyrightText: 2021 Larry Bank <bitbank@pobox.com>
+// SPDX-License-Identifier: Apache-2.0
 //
 // JPEG Encoder
 //
-// written by Larry Bank
-// bitbank@pobox.com
 // Arduino port started 7/22/2021
 // Original JPEG code written 20+ years ago :)
 // The goal of this code is to encode JPEG images on embedded systems
