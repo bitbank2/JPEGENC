@@ -196,10 +196,10 @@ int main(int argc, const char * argv[]) {
         }
         if (iBpp == 24) {
             iBytePP = 3;
-            ucPixelType = JPEGE_PIXEL_RGB888;
+            ucPixelType = JPEGE_PIXEL_BGR888;
         } else { // must be 32-bpp
             iBytePP = 4;
-            ucPixelType = JPEGE_PIXEL_ARGB8888;
+            ucPixelType = JPEGE_PIXEL_RGBA8888;
         }
         iPitch = iBytePP * iWidth;
 #ifdef MEM_TO_MEM

@@ -168,7 +168,7 @@ int main(int argc, const char * argv[]) {
     }
     rc = jpg.open(pOut, iOutputSize);
     if (rc == JPEGE_SUCCESS) {
-        rc = jpg.encodeBegin(&jpe, w, h, JPEGE_PIXEL_RGB888, JPEGE_SUBSAMPLE_420, JPEGE_Q_HIGH);
+        rc = jpg.encodeBegin(&jpe, w, h, JPEGE_PIXEL_BGR888, JPEGE_SUBSAMPLE_420, JPEGE_Q_HIGH);
         if (rc == JPEGE_SUCCESS) {
             for (y=0; y<h; y+=16) { // MCUs are 16 lines tall for 4:2:0 subsampling
                 for (k=0; k<16; k++) {
