@@ -1724,6 +1724,146 @@ void JPEGGetMCU11(unsigned char *pImage, JPEGE_IMAGE *pPage, int iPitch)
     
 } /* JPEGGetMCU11() */
 
+static void JPEGLoadMCU(unsigned char *pImage, JPEGE_IMAGE *pPage, int iPitch)
+{
+    if (pPage->ucPixelType == JPEGE_PIXEL_GRAYSCALE)
+        JPEGGetMCU(pImage, iPitch, pPage->MCUc);
+    else if (pPage->ucSubSample == JPEGE_SUBSAMPLE_444)
+        JPEGGetMCU11(pImage, pPage, iPitch);
+    else
+        JPEGGetMCU22(pImage, pPage, iPitch);
+} /* JPEGLoadMCU() */
+
+static void JPEGGetRGBYCbCr(const uint8_t *pPixel, uint8_t ucPixelType, int *pY, int *pCb, int *pCr)
+{
+    unsigned char cRed, cGreen, cBlue;
+    unsigned short us;
+
+    if (ucPixelType == JPEGE_PIXEL_RGB565) {
+        memcpy(&us, pPixel, sizeof(us));
+        cBlue = (unsigned char)(((us & 0x1f)<<3) | (us & 7));
+        cGreen = (unsigned char)(((us & 0x7e0)>>3) | ((us & 0x60)>>5));
+        cRed = (unsigned char)(((us & 0xf800)>>8) | ((us & 0x3800)>>11));
+    } else if (ucPixelType == JPEGE_PIXEL_RGB888) {
+        cBlue = pPixel[0];
+        cGreen = pPixel[1];
+        cRed = pPixel[2];
+    } else {
+        cRed = pPixel[0];
+        cGreen = pPixel[1];
+        cBlue = pPixel[2];
+    }
+
+    *pY = (((cRed * 1225) + (cGreen * 2404) + (cBlue * 467)) >> 12) - 0x80;
+    *pCb = (cBlue << 11) + (cRed * -691) + (cGreen * -1357);
+    *pCr = (cRed << 11) + (cGreen * -1715) + (cBlue * -333);
+} /* JPEGGetRGBYCbCr() */
+
+static void JPEGGetYUV422YCbCr(const uint8_t *pRow, int x, int width, int *pY, int *pCb, int *pCr)
+{
+    int pair_x = x & ~1;
+
+    *pY = (int)pRow[x * 2] - 0x80;
+    if (pair_x + 1 >= width) {
+        if (pair_x >= 2) {
+            pair_x -= 2;
+        } else {
+            *pCb = pRow[1];
+            *pCr = pRow[1];
+            return;
+        }
+    }
+    *pCb = pRow[pair_x * 2 + 1];
+    *pCr = pRow[pair_x * 2 + 3];
+} /* JPEGGetYUV422YCbCr() */
+
+void JPEGLoadEdgeMCU(const uint8_t *pImage, JPEGE_IMAGE *pPage, int iPitch, int width, int height)
+{
+    signed char *pMCUData = pPage->MCUc;
+    int bytes_per_pixel;
+    int x, y;
+
+    if (pPage->ucPixelType == JPEGE_PIXEL_GRAYSCALE) {
+        for (y = 0; y < 8; y++) {
+            int source_y = y < height ? y : height - 1;
+
+            for (x = 0; x < 8; x++) {
+                int source_x = x < width ? x : width - 1;
+
+                pMCUData[y * 8 + x] = (signed char)(pImage[source_y * iPitch + source_x] - 0x80);
+            }
+        }
+        return;
+    }
+
+    if (pPage->ucSubSample == JPEGE_SUBSAMPLE_444) {
+        if (pPage->ucPixelType == JPEGE_PIXEL_RGB565)
+            bytes_per_pixel = 2;
+        else if (pPage->ucPixelType == JPEGE_PIXEL_RGB888)
+            bytes_per_pixel = 3;
+        else
+            bytes_per_pixel = 4;
+
+        for (y = 0; y < 8; y++) {
+            int source_y = y < height ? y : height - 1;
+
+            for (x = 0; x < 8; x++) {
+                int source_x = x < width ? x : width - 1;
+                int offset = y * 8 + x;
+                int iY, iCb, iCr;
+
+                JPEGGetRGBYCbCr(&pImage[source_y * iPitch + source_x * bytes_per_pixel], pPage->ucPixelType, &iY, &iCb, &iCr);
+                pMCUData[offset] = (signed char)iY;
+                pMCUData[DCTSIZE + offset] = (signed char)(iCb >> 12);
+                pMCUData[DCTSIZE * 2 + offset] = (signed char)(iCr >> 12);
+            }
+        }
+        return;
+    }
+
+    if (pPage->ucPixelType == JPEGE_PIXEL_RGB565)
+        bytes_per_pixel = 2;
+    else if (pPage->ucPixelType == JPEGE_PIXEL_RGB888)
+        bytes_per_pixel = 3;
+    else
+        bytes_per_pixel = 4;
+
+    for (y = 0; y < 16; y += 2) {
+        for (x = 0; x < 16; x += 2) {
+            int iY[4], iCb[4], iCr[4];
+            int i;
+
+            for (i = 0; i < 4; i++) {
+                int pixel_x = x + (i & 1);
+                int pixel_y = y + (i >> 1);
+                int source_x = pixel_x < width ? pixel_x : width - 1;
+                int source_y = pixel_y < height ? pixel_y : height - 1;
+
+                if (pPage->ucPixelType == JPEGE_PIXEL_YUV422) {
+                    JPEGGetYUV422YCbCr(&pImage[source_y * iPitch], source_x, width, &iY[i], &iCb[i], &iCr[i]);
+                } else {
+                    JPEGGetRGBYCbCr(&pImage[source_y * iPitch + source_x * bytes_per_pixel], pPage->ucPixelType, &iY[i], &iCb[i], &iCr[i]);
+                }
+
+                {
+                    int block = ((pixel_y >> 3) << 1) + (pixel_x >> 3);
+                    int offset = ((pixel_y & 7) << 3) + (pixel_x & 7);
+
+                    pMCUData[block * DCTSIZE + offset] = (signed char)iY[i];
+                }
+            }
+
+            if (pPage->ucPixelType == JPEGE_PIXEL_YUV422) {
+                pMCUData[4 * DCTSIZE + (y >> 1) * 8 + (x >> 1)] = (signed char)(((iCb[0] + iCb[1] + iCb[2] + iCb[3] + 2) >> 2) - 0x80);
+                pMCUData[5 * DCTSIZE + (y >> 1) * 8 + (x >> 1)] = (signed char)(((iCr[0] + iCr[1] + iCr[2] + iCr[3] + 2) >> 2) - 0x80);
+            } else {
+                pMCUData[4 * DCTSIZE + (y >> 1) * 8 + (x >> 1)] = (signed char)((iCb[0] + iCb[1] + iCb[2] + iCb[3]) >> 14);
+                pMCUData[5 * DCTSIZE + (y >> 1) * 8 + (x >> 1)] = (signed char)((iCr[0] + iCr[1] + iCr[2] + iCr[3]) >> 14);
+            }
+        }
+    }
+} /* JPEGLoadEdgeMCU() */
+
 void JPEGFDCT(signed char *pMCUSrc, signed short *pMCUDest)
 {
     int iCol;
@@ -1832,8 +1972,27 @@ int JPEGAddMCU(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, uint8_t *pPixels, int iP
         pJPEG->iError = JPEGE_INVALID_PARAMETER;
         return JPEGE_INVALID_PARAMETER;
     }
+
+    {
+        int mcu_width = pEncode->cx;
+        int mcu_height = pEncode->cy;
+        int valid_width = pJPEG->iWidth - pEncode->x;
+        int valid_height = pJPEG->iHeight - pEncode->y;
+
+        if (valid_width > mcu_width) {
+            valid_width = mcu_width;
+        }
+        if (valid_height > mcu_height) {
+            valid_height = mcu_height;
+        }
+        if (valid_width < mcu_width || valid_height < mcu_height) {
+            JPEGLoadEdgeMCU(pPixels, pJPEG, iPitch, valid_width, valid_height);
+        } else {
+            JPEGLoadMCU(pPixels, pJPEG, iPitch);
+        }
+    }
+
     if (pJPEG->ucPixelType == JPEGE_PIXEL_GRAYSCALE) {
-        JPEGGetMCU(pPixels, iPitch, pJPEG->MCUc);
         JPEGFDCT(pJPEG->MCUc, pJPEG->MCUs);
         bSparse = JPEGQuantize(pJPEG, pJPEG->MCUs, 0);
         pJPEG->iDCPred0 = JPEGEncodeMCU(0, pJPEG, pJPEG->MCUs, pJPEG->iDCPred0, bSparse);
@@ -1854,7 +2013,6 @@ int JPEGAddMCU(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, uint8_t *pPixels, int iP
         } // grayscale
     } else { // color
         if (pJPEG->ucSubSample == JPEGE_SUBSAMPLE_444) {
-            JPEGGetMCU11(pPixels, pJPEG, iPitch);
             JPEGFDCT(&pJPEG->MCUc[0*DCTSIZE], pJPEG->MCUs);
             // Y
             bSparse = JPEGQuantize(pJPEG, pJPEG->MCUs, 0);
@@ -1868,7 +2026,6 @@ int JPEGAddMCU(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, uint8_t *pPixels, int iP
             bSparse = JPEGQuantize(pJPEG, pJPEG->MCUs, 1);
             pJPEG->iDCPred2 = JPEGEncodeMCU(1, pJPEG, pJPEG->MCUs, pJPEG->iDCPred2, bSparse);
         } else { // must be 420
-            JPEGGetMCU22(pPixels, pJPEG, iPitch);
             JPEGFDCT(&pJPEG->MCUc[0*DCTSIZE], pJPEG->MCUs); // Y0
             bSparse = JPEGQuantize(pJPEG, pJPEG->MCUs, 0);
             pJPEG->iDCPred0 = JPEGEncodeMCU(0, pJPEG, pJPEG->MCUs, pJPEG->iDCPred0, bSparse);
