@@ -21,42 +21,19 @@
 //
 #include "JPEGENC.h"
 
-// Include the C code which does the actual work
-#include "jpegenc.inl"
+// The portable C code is compiled separately from jpegenc.c
 
 //
 // File (SD/MMC) based initialization
 //
 int JPEGENC::open(const char *szFilename, JPEGE_OPEN_CALLBACK *pfnOpen, JPEGE_CLOSE_CALLBACK *pfnClose, JPEGE_READ_CALLBACK *pfnRead, JPEGE_WRITE_CALLBACK *pfnWrite, JPEGE_SEEK_CALLBACK *pfnSeek)
 {
-    if (szFilename == NULL || pfnOpen == NULL || pfnClose == NULL || pfnRead == NULL || pfnWrite == NULL || pfnSeek == NULL) {
-        return JPEGE_INVALID_PARAMETER;
-    }
-    memset(&_jpeg, 0, sizeof(JPEGE_IMAGE));
-    _jpeg.pfnRead = pfnRead;
-    _jpeg.pfnWrite = pfnWrite;
-    _jpeg.pfnSeek = pfnSeek;
-    _jpeg.pfnOpen = pfnOpen;
-    _jpeg.pfnClose = pfnClose;
-    _jpeg.JPEGFile.fHandle = (*pfnOpen)(szFilename);
-    _jpeg.pHighWater = &_jpeg.ucFileBuf[JPEGE_FILE_BUF_SIZE - 512];
-    if (_jpeg.JPEGFile.fHandle == NULL) {
-        _jpeg.iError = JPEGE_INVALID_FILE;
-       return JPEGE_INVALID_FILE;
-    }
-    return JPEGE_SUCCESS;
-
+    return JPEGOpen(&_jpeg, szFilename, pfnOpen, pfnClose, pfnRead, pfnWrite, pfnSeek);
 } /* open() */
 
 int JPEGENC::open(uint8_t *pOutput, int iBufferSize)
 {
-    if (!pOutput || iBufferSize < 1024) return JPEGE_INVALID_PARAMETER;
-    memset(&_jpeg, 0, sizeof(JPEGE_IMAGE));
-    _jpeg.pOutput = pOutput;
-    _jpeg.iBufferSize = iBufferSize;
-    _jpeg.pHighWater = &pOutput[iBufferSize - 512];
-
-    return JPEGE_SUCCESS;
+    return JPEGOpenRAM(&_jpeg, pOutput, iBufferSize);
 } /* open() */
 
 //
@@ -64,17 +41,14 @@ int JPEGENC::open(uint8_t *pOutput, int iBufferSize)
 //
 int JPEGENC::getLastError()
 {
-    return _jpeg.iError;
+    return JPEGGetLastError(&_jpeg);
 } /* getLastError() */
 //
 // Close the file - not needed when decoding from memory
 //
 int JPEGENC::close()
 {
-    JPEGEncodeEnd(&_jpeg);
-    if (_jpeg.pfnClose)
-        (*_jpeg.pfnClose)(&_jpeg.JPEGFile);
-    return _jpeg.iDataSize;
+    return JPEGClose(&_jpeg);
 } /* close() */
 
 int JPEGENC::encodeBegin(JPEGENCODE *pEncode, int iWidth, int iHeight, uint8_t ucPixelType, uint8_t ucSubSample, uint8_t ucQFactor)

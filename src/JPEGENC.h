@@ -203,13 +203,24 @@ class JPEGENC
 };
 #else
 #define JPEG_STATIC
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+int JPEGOpen(JPEGE_IMAGE *pJPEG, const char *szFilename, JPEGE_OPEN_CALLBACK *pfnOpen, JPEGE_CLOSE_CALLBACK *pfnClose, JPEGE_READ_CALLBACK *pfnRead, JPEGE_WRITE_CALLBACK *pfnWrite, JPEGE_SEEK_CALLBACK *pfnSeek);
 int JPEGOpenRAM(JPEGE_IMAGE *pJPEG, uint8_t *pData, int iDataSize);
-int JPEGOpenFile(JPEGE_IMAGE *pJPEG, const char *szFilename);
+int JPEGClose(JPEGE_IMAGE *pJPEG);
 int JPEGEncodeBegin(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, int iWidth, int iHeight, uint8_t ucPixelType, uint8_t ucSubSample, uint8_t ucQFactor);
 int JPEGEncodeEnd(JPEGE_IMAGE *pJPEG);
 int JPEGAddMCU(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, uint8_t *pPixels, int iPitch);
+int JPEGAddFrame(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, uint8_t *pPixels, int iPitch);
 int JPEGGetLastError(JPEGE_IMAGE *pJPEG);
-#endif // __cplusplus
+
+#ifdef __cplusplus
+}
+#endif
 
 // Due to unaligned memory causing an exception, we have to do these macros the slow way
 #define INTELSHORT(p) ((*p) + (*(p+1)<<8))
