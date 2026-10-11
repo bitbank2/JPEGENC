@@ -113,11 +113,18 @@ enum {
 
 // Pixel types
 enum {
+    // 8-bit grayscale
     JPEGE_PIXEL_GRAYSCALE = 0,
+    // packed RGB565, expanded to 8-bit channels and converted to YCbCr
     JPEGE_PIXEL_RGB565,
+    // packed BGR888, converted to YCbCr
     JPEGE_PIXEL_RGB888,
+    // packed RGBX8888, converted to YCbCr; the fourth byte is ignored
     JPEGE_PIXEL_ARGB8888,
+    // packed YCbCr 4:2:2 (Y, Cb, Y, Cr), downsampled to 4:2:0
     JPEGE_PIXEL_YUV422,
+    // planar YCbCr 4:2:0 (Y, Cb, Cr planes)
+    JPEGE_PIXEL_YUV420P,
     JPEGE_PIXEL_COUNT
 };
 // Compression quality
@@ -196,6 +203,7 @@ class JPEGENC
     int encodeBegin(JPEGENCODE *pEncode, int iWidth, int iHeight, uint8_t ucPixelType, uint8_t ucSubSample, uint8_t ucQFactor);
     int addMCU(JPEGENCODE *pEncode, uint8_t *pPixels, int iPitch);
     int addFrame(JPEGENCODE *pEncode, uint8_t *pPixels, int iPitch);
+    int addFrameYUV420P(JPEGENCODE *pEncode, const uint8_t *pY, int iYPitch, const uint8_t *pCb, int iCbPitch, const uint8_t *pCr, int iCrPitch);
     int getLastError();
 
   private:
@@ -216,6 +224,7 @@ int JPEGEncodeBegin(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, int iWidth, int iHe
 int JPEGEncodeEnd(JPEGE_IMAGE *pJPEG);
 int JPEGAddMCU(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, uint8_t *pPixels, int iPitch);
 int JPEGAddFrame(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, uint8_t *pPixels, int iPitch);
+int JPEGAddFrameYUV420P(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, const uint8_t *pY, int iYPitch, const uint8_t *pCb, int iCbPitch, const uint8_t *pCr, int iCrPitch);
 int JPEGGetLastError(JPEGE_IMAGE *pJPEG);
 
 #ifdef __cplusplus

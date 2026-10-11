@@ -837,6 +837,9 @@ int JPEGEncodeBegin(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, int iWidth, int iHe
     if (ucPixelType >= JPEGE_PIXEL_COUNT || (ucSubSample != JPEGE_SUBSAMPLE_444 && ucSubSample != JPEGE_SUBSAMPLE_420) || ucQFactor > JPEGE_Q_LOW) {
         return JPEGE_INVALID_PARAMETER;
     }
+    if (ucPixelType == JPEGE_PIXEL_YUV420P && ucSubSample != JPEGE_SUBSAMPLE_420) {
+        return JPEGE_INVALID_PARAMETER;
+    }
     pJPEG->iDCPred0 = pJPEG->iDCPred1 = pJPEG->iDCPred2 = 0; // DC predictor values reset to 0
     pJPEG->iWidth = iWidth;
     pJPEG->iHeight = iHeight;
@@ -1864,6 +1867,52 @@ void JPEGLoadEdgeMCU(const uint8_t *pImage, JPEGE_IMAGE *pPage, int iPitch, int 
     }
 } /* JPEGLoadEdgeMCU() */
 
+// all other functions assume packed representations. This one
+// works with planar pixel formats.
+static void JPEGLoadYUV420P(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, const uint8_t *pY, int iYPitch, const uint8_t *pCb, int iCbPitch, const uint8_t *pCr, int iCrPitch)
+{
+    signed char *pMCUData = pJPEG->MCUc;
+    int chroma_width = (pJPEG->iWidth + 1) / 2;
+    int chroma_height = (pJPEG->iHeight + 1) / 2;
+    int x;
+    int y;
+
+    for (y = 0; y < 16; y++) {
+        int source_y = pEncode->y + y;
+
+        if (source_y >= pJPEG->iHeight)
+            source_y = pJPEG->iHeight - 1;
+        for (x = 0; x < 16; x++) {
+            int source_x = pEncode->x + x;
+            int block = ((y >> 3) << 1) + (x >> 3);
+            int offset = ((y & 7) << 3) + (x & 7);
+
+            if (source_x >= pJPEG->iWidth)
+                source_x = pJPEG->iWidth - 1;
+            pMCUData[block * DCTSIZE + offset] =
+                (signed char)(pY[source_y * iYPitch + source_x] - 128);
+        }
+    }
+
+    for (y = 0; y < 8; y++) {
+        int source_y = (pEncode->y >> 1) + y;
+
+        if (source_y >= chroma_height)
+            source_y = chroma_height - 1;
+        for (x = 0; x < 8; x++) {
+            int source_x = (pEncode->x >> 1) + x;
+            int offset = y * 8 + x;
+
+            if (source_x >= chroma_width)
+                source_x = chroma_width - 1;
+            pMCUData[4 * DCTSIZE + offset] =
+                (signed char)(pCb[source_y * iCbPitch + source_x] - 128);
+            pMCUData[5 * DCTSIZE + offset] =
+                (signed char)(pCr[source_y * iCrPitch + source_x] - 128);
+        }
+    }
+} /* JPEGLoadYUV420P() */
+
 void JPEGFDCT(signed char *pMCUSrc, signed short *pMCUDest)
 {
     int iCol;
@@ -1963,35 +2012,10 @@ void FlushCode(PIL_CODE *pPC)
     pPC->iLen = 0;
 } /* FlushCode() */
 
-int JPEGAddMCU(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, uint8_t *pPixels, int iPitch)
+static int JPEGEncodeMCUData(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode)
 {
     int bSparse;
     
-    if (pEncode->y >= pJPEG->iHeight) {
-        // the image is already complete or was not initialized properly
-        pJPEG->iError = JPEGE_INVALID_PARAMETER;
-        return JPEGE_INVALID_PARAMETER;
-    }
-
-    {
-        int mcu_width = pEncode->cx;
-        int mcu_height = pEncode->cy;
-        int valid_width = pJPEG->iWidth - pEncode->x;
-        int valid_height = pJPEG->iHeight - pEncode->y;
-
-        if (valid_width > mcu_width) {
-            valid_width = mcu_width;
-        }
-        if (valid_height > mcu_height) {
-            valid_height = mcu_height;
-        }
-        if (valid_width < mcu_width || valid_height < mcu_height) {
-            JPEGLoadEdgeMCU(pPixels, pJPEG, iPitch, valid_width, valid_height);
-        } else {
-            JPEGLoadMCU(pPixels, pJPEG, iPitch);
-        }
-    }
-
     if (pJPEG->ucPixelType == JPEGE_PIXEL_GRAYSCALE) {
         JPEGFDCT(pJPEG->MCUc, pJPEG->MCUs);
         bSparse = JPEGQuantize(pJPEG, pJPEG->MCUs, 0);
@@ -2073,6 +2097,42 @@ int JPEGAddMCU(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, uint8_t *pPixels, int iP
         }
     }
     return JPEGE_SUCCESS;
+} /* JPEGEncodeMCUData() */
+
+int JPEGAddMCU(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, uint8_t *pPixels, int iPitch)
+{
+    int mcu_width;
+    int mcu_height;
+    int valid_width;
+    int valid_height;
+
+    if (pJPEG == NULL || pEncode == NULL || pPixels == NULL || iPitch < 1) {
+        return JPEGE_INVALID_PARAMETER;
+    }
+    if (pEncode->y >= pJPEG->iHeight ||
+        pJPEG->ucPixelType == JPEGE_PIXEL_YUV420P) {
+        pJPEG->iError = JPEGE_INVALID_PARAMETER;
+        return JPEGE_INVALID_PARAMETER;
+    }
+
+    mcu_width = pEncode->cx;
+    mcu_height = pEncode->cy;
+    valid_width = pJPEG->iWidth - pEncode->x;
+    valid_height = pJPEG->iHeight - pEncode->y;
+    if (valid_width > mcu_width) {
+        valid_width = mcu_width;
+    }
+    if (valid_height > mcu_height) {
+        valid_height = mcu_height;
+    }
+
+    if (valid_width < mcu_width || valid_height < mcu_height) {
+        JPEGLoadEdgeMCU(pPixels, pJPEG, iPitch, valid_width, valid_height);
+    } else {
+        JPEGLoadMCU(pPixels, pJPEG, iPitch);
+    }
+
+    return JPEGEncodeMCUData(pJPEG, pEncode);
 } /* JPEGAddMCU() */
 
 int JPEGAddFrame(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, uint8_t *pPixels, int iPitch)
@@ -2081,6 +2141,13 @@ int x, y;
 uint8_t *s;
 int rc = JPEGE_SUCCESS;
 int iBPMCU;
+
+    if (pJPEG == NULL || pEncode == NULL || pPixels == NULL || iPitch < 1 ||
+        pJPEG->ucPixelType == JPEGE_PIXEL_YUV420P) {
+        if (pJPEG != NULL)
+            pJPEG->iError = JPEGE_INVALID_PARAMETER;
+        return JPEGE_INVALID_PARAMETER;
+    }
 
     iBPMCU = pEncode->cx;
     switch (pJPEG->ucPixelType) {
@@ -2108,4 +2175,32 @@ int iBPMCU;
     } // for y
     return rc;
 } /* JPEGAddFrame() */
+
+int JPEGAddFrameYUV420P(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, const uint8_t *pY, int iYPitch, const uint8_t *pCb, int iCbPitch, const uint8_t *pCr, int iCrPitch)
+{
+    int chroma_width;
+    int rc = JPEGE_SUCCESS;
+
+    if (pJPEG == NULL || pEncode == NULL || pY == NULL || pCb == NULL ||
+        pCr == NULL) {
+        return JPEGE_INVALID_PARAMETER;
+    }
+
+    chroma_width = (pJPEG->iWidth + 1) / 2;
+    if (pJPEG->ucPixelType != JPEGE_PIXEL_YUV420P ||
+        pJPEG->ucSubSample != JPEGE_SUBSAMPLE_420 ||
+        iYPitch < pJPEG->iWidth || iCbPitch < chroma_width ||
+        iCrPitch < chroma_width) {
+        pJPEG->iError = JPEGE_INVALID_PARAMETER;
+        return JPEGE_INVALID_PARAMETER;
+    }
+
+    while (pEncode->y < pJPEG->iHeight && rc == JPEGE_SUCCESS) {
+        JPEGLoadYUV420P(pJPEG, pEncode, pY, iYPitch, pCb, iCbPitch,
+                       pCr, iCrPitch);
+        rc = JPEGEncodeMCUData(pJPEG, pEncode);
+    }
+
+    return rc;
+} /* JPEGAddFrameYUV420P() */
 
