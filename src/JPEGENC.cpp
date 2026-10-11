@@ -71,3 +71,8 @@ int JPEGENC::addFrameYUV420P(JPEGENCODE *pEncode, const uint8_t *pY, int iYPitch
     return JPEGAddFrameYUV420P(&_jpeg, pEncode, pY, iYPitch, pCb, iCbPitch, pCr, iCrPitch);
 } /* addFrameYUV420P() */
 
+int JPEGENC::addFrameNV12(JPEGENCODE *pEncode, const uint8_t *pY, int iYPitch, const uint8_t *pUV, int iUVPitch)
+{
+    return JPEGAddFrameNV12(&_jpeg, pEncode, pY, iYPitch, pUV, iUVPitch);
+} /* addFrameNV12() */
+

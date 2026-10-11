@@ -125,6 +125,8 @@ enum {
     JPEGE_PIXEL_YUV422,
     // planar YCbCr 4:2:0 (Y, Cb, Cr planes)
     JPEGE_PIXEL_YUV420P,
+    // semi-planar YCbCr 4:2:0 (Y plane, interleaved CbCr plane)
+    JPEGE_PIXEL_NV12,
     JPEGE_PIXEL_COUNT
 };
 // Compression quality
@@ -204,6 +206,7 @@ class JPEGENC
     int addMCU(JPEGENCODE *pEncode, uint8_t *pPixels, int iPitch);
     int addFrame(JPEGENCODE *pEncode, uint8_t *pPixels, int iPitch);
     int addFrameYUV420P(JPEGENCODE *pEncode, const uint8_t *pY, int iYPitch, const uint8_t *pCb, int iCbPitch, const uint8_t *pCr, int iCrPitch);
+    int addFrameNV12(JPEGENCODE *pEncode, const uint8_t *pY, int iYPitch, const uint8_t *pUV, int iUVPitch);
     int getLastError();
 
   private:
@@ -225,6 +228,7 @@ int JPEGEncodeEnd(JPEGE_IMAGE *pJPEG);
 int JPEGAddMCU(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, uint8_t *pPixels, int iPitch);
 int JPEGAddFrame(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, uint8_t *pPixels, int iPitch);
 int JPEGAddFrameYUV420P(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, const uint8_t *pY, int iYPitch, const uint8_t *pCb, int iCbPitch, const uint8_t *pCr, int iCrPitch);
+int JPEGAddFrameNV12(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, const uint8_t *pY, int iYPitch, const uint8_t *pUV, int iUVPitch);
 int JPEGGetLastError(JPEGE_IMAGE *pJPEG);
 
 #ifdef __cplusplus

@@ -837,7 +837,8 @@ int JPEGEncodeBegin(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, int iWidth, int iHe
     if (ucPixelType >= JPEGE_PIXEL_COUNT || (ucSubSample != JPEGE_SUBSAMPLE_444 && ucSubSample != JPEGE_SUBSAMPLE_420) || ucQFactor > JPEGE_Q_LOW) {
         return JPEGE_INVALID_PARAMETER;
     }
-    if (ucPixelType == JPEGE_PIXEL_YUV420P && ucSubSample != JPEGE_SUBSAMPLE_420) {
+    if ((ucPixelType == JPEGE_PIXEL_YUV420P || ucPixelType == JPEGE_PIXEL_NV12) &&
+        ucSubSample != JPEGE_SUBSAMPLE_420) {
         return JPEGE_INVALID_PARAMETER;
     }
     pJPEG->iDCPred0 = pJPEG->iDCPred1 = pJPEG->iDCPred2 = 0; // DC predictor values reset to 0
@@ -1867,13 +1868,11 @@ void JPEGLoadEdgeMCU(const uint8_t *pImage, JPEGE_IMAGE *pPage, int iPitch, int 
     }
 } /* JPEGLoadEdgeMCU() */
 
-// all other functions assume packed representations. This one
-// works with planar pixel formats.
-static void JPEGLoadYUV420P(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, const uint8_t *pY, int iYPitch, const uint8_t *pCb, int iCbPitch, const uint8_t *pCr, int iCrPitch)
+// all other functions assume packed representations. These functions
+// work with planar and semi-planar pixel formats.
+static void JPEGLoadYUV420Luma(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, const uint8_t *pY, int iYPitch)
 {
     signed char *pMCUData = pJPEG->MCUc;
-    int chroma_width = (pJPEG->iWidth + 1) / 2;
-    int chroma_height = (pJPEG->iHeight + 1) / 2;
     int x;
     int y;
 
@@ -1893,6 +1892,17 @@ static void JPEGLoadYUV420P(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, const uint8
                 (signed char)(pY[source_y * iYPitch + source_x] - 128);
         }
     }
+} /* JPEGLoadYUV420Luma() */
+
+static void JPEGLoadYUV420P(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, const uint8_t *pY, int iYPitch, const uint8_t *pCb, int iCbPitch, const uint8_t *pCr, int iCrPitch)
+{
+    signed char *pMCUData = pJPEG->MCUc;
+    int chroma_width = (pJPEG->iWidth + 1) / 2;
+    int chroma_height = (pJPEG->iHeight + 1) / 2;
+    int x;
+    int y;
+
+    JPEGLoadYUV420Luma(pJPEG, pEncode, pY, iYPitch);
 
     for (y = 0; y < 8; y++) {
         int source_y = (pEncode->y >> 1) + y;
@@ -1912,6 +1922,37 @@ static void JPEGLoadYUV420P(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, const uint8
         }
     }
 } /* JPEGLoadYUV420P() */
+
+static void JPEGLoadNV12(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, const uint8_t *pY, int iYPitch, const uint8_t *pUV, int iUVPitch)
+{
+    signed char *pMCUData = pJPEG->MCUc;
+    int chroma_width = (pJPEG->iWidth + 1) / 2;
+    int chroma_height = (pJPEG->iHeight + 1) / 2;
+    int x;
+    int y;
+
+    JPEGLoadYUV420Luma(pJPEG, pEncode, pY, iYPitch);
+
+    for (y = 0; y < 8; y++) {
+        int source_y = (pEncode->y >> 1) + y;
+
+        if (source_y >= chroma_height)
+            source_y = chroma_height - 1;
+        for (x = 0; x < 8; x++) {
+            int source_x = (pEncode->x >> 1) + x;
+            int offset = y * 8 + x;
+            const uint8_t *pUVPixel;
+
+            if (source_x >= chroma_width)
+                source_x = chroma_width - 1;
+            pUVPixel = &pUV[source_y * iUVPitch + source_x * 2];
+            pMCUData[4 * DCTSIZE + offset] =
+                (signed char)(pUVPixel[0] - 128);
+            pMCUData[5 * DCTSIZE + offset] =
+                (signed char)(pUVPixel[1] - 128);
+        }
+    }
+} /* JPEGLoadNV12() */
 
 void JPEGFDCT(signed char *pMCUSrc, signed short *pMCUDest)
 {
@@ -2110,7 +2151,8 @@ int JPEGAddMCU(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, uint8_t *pPixels, int iP
         return JPEGE_INVALID_PARAMETER;
     }
     if (pEncode->y >= pJPEG->iHeight ||
-        pJPEG->ucPixelType == JPEGE_PIXEL_YUV420P) {
+        pJPEG->ucPixelType == JPEGE_PIXEL_YUV420P ||
+        pJPEG->ucPixelType == JPEGE_PIXEL_NV12) {
         pJPEG->iError = JPEGE_INVALID_PARAMETER;
         return JPEGE_INVALID_PARAMETER;
     }
@@ -2143,7 +2185,8 @@ int rc = JPEGE_SUCCESS;
 int iBPMCU;
 
     if (pJPEG == NULL || pEncode == NULL || pPixels == NULL || iPitch < 1 ||
-        pJPEG->ucPixelType == JPEGE_PIXEL_YUV420P) {
+        pJPEG->ucPixelType == JPEGE_PIXEL_YUV420P ||
+        pJPEG->ucPixelType == JPEGE_PIXEL_NV12) {
         if (pJPEG != NULL)
             pJPEG->iError = JPEGE_INVALID_PARAMETER;
         return JPEGE_INVALID_PARAMETER;
@@ -2203,4 +2246,29 @@ int JPEGAddFrameYUV420P(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, const uint8_t *
 
     return rc;
 } /* JPEGAddFrameYUV420P() */
+
+int JPEGAddFrameNV12(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, const uint8_t *pY, int iYPitch, const uint8_t *pUV, int iUVPitch)
+{
+    int chroma_width;
+    int rc = JPEGE_SUCCESS;
+
+    if (pJPEG == NULL || pEncode == NULL || pY == NULL || pUV == NULL) {
+        return JPEGE_INVALID_PARAMETER;
+    }
+
+    chroma_width = (pJPEG->iWidth + 1) / 2;
+    if (pJPEG->ucPixelType != JPEGE_PIXEL_NV12 ||
+        pJPEG->ucSubSample != JPEGE_SUBSAMPLE_420 ||
+        iYPitch < pJPEG->iWidth || iUVPitch < chroma_width * 2) {
+        pJPEG->iError = JPEGE_INVALID_PARAMETER;
+        return JPEGE_INVALID_PARAMETER;
+    }
+
+    while (pEncode->y < pJPEG->iHeight && rc == JPEGE_SUCCESS) {
+        JPEGLoadNV12(pJPEG, pEncode, pY, iYPitch, pUV, iUVPitch);
+        rc = JPEGEncodeMCUData(pJPEG, pEncode);
+    }
+
+    return rc;
+} /* JPEGAddFrameNV12() */
 
