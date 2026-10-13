@@ -19,17 +19,17 @@
 // limitations under the License.
 //===========================================================================
 //
-#ifndef __JPEGENC__
-#define __JPEGENC__
+#ifndef JPEGENC_H
+#define JPEGENC_H
 #if defined( JPEGENC_NO_ARDUINO ) || defined( MICROPY_PY_SENSOR ) || defined( __MACH__ ) || defined( __LINUX__ ) || defined( __MCUXPRESSO ) || defined( ESP_PLATFORM )
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 #include <stdio.h>
-#ifndef memcpy_P
-#define memcpy_P memcpy
-#endif
 #ifndef PROGMEM
+// PROGMEM is an Arduino/AVR storage annotation meaning "keep this data in
+// program memory," usually flash, rather than consuming scarce SRAM. Define it
+// as empty on other architectures.
 #define PROGMEM
 #endif
 #else
@@ -53,21 +53,21 @@
 #if (INTPTR_MAX == INT64_MAX)
 #define JPEGE_REGISTER_WIDTH 64
 // structure for outputting variable length codes
-typedef struct pil_code_tag
+typedef struct jpege_code_tag
 {
 unsigned char *pOut; // current output pointer
 int64_t iLen;  // length of data in accumulator
 uint64_t ulAcc; // code accumulator (holds codes until at least 64-bits ready to write
-} PIL_CODE;
+} JPEGE_CODE;
 #else
 #define JPEGE_REGISTER_WIDTH 32
 // structure for outputting variable length codes
-typedef struct pil_code_tag
+typedef struct jpege_code_tag
 {
 unsigned char *pOut; // current output pointer
 int32_t iLen;  // length of data in accumulator
 uint32_t ulAcc; // code accumulator (holds codes until at least 32-bits ready to write
-} PIL_CODE;
+} JPEGE_CODE;
 // 32-bit output stage assumes that unaligned writes are not allowed
 #endif
 
@@ -148,7 +148,7 @@ typedef struct jpege_image_tag
     int iError;
     int iRestart; // current restart counter
     int iDCPred0, iDCPred1, iDCPred2; // DC predictor values for the 3 color components
-    PIL_CODE pc;
+    JPEGE_CODE pc;
     int *huffdc[2];
     signed short sQuantTable[JPEGE_DCT_SIZE*4];
     signed char MCUc[6*JPEGE_DCT_SIZE]; // captured image data
@@ -209,4 +209,4 @@ int JPEGENC_GetLastError(JPEGE_IMAGE *pJPEG);
 }
 #endif
 
-#endif // __JPEGENC__
+#endif // JPEGENC_H

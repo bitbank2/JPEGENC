@@ -2080,7 +2080,7 @@ static void JPEGFDCT(signed char *pMCUSrc, signed short *pMCUDest)
     } // for each column
 } /* JPEGFDCT() */
 
-static void FlushCode(PIL_CODE *pPC)
+static void FlushCode(JPEGE_CODE *pPC)
 {
     unsigned char c;
    
