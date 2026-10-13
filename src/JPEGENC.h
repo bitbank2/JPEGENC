@@ -26,8 +26,12 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdio.h>
+#ifndef memcpy_P
 #define memcpy_P memcpy
+#endif
+#ifndef PROGMEM
 #define PROGMEM
+#endif
 #else
 #include <Arduino.h>
 #endif
@@ -39,11 +43,6 @@
 // Designed to encode JPEG files from source images (8 or 24 bpp)
 // using less than 20K of RAM
 //
-#ifndef FALSE
-#define FALSE 0
-#define TRUE 1
-#endif
-
 /* Defines and variables */
 #define JPEGE_FILE_BUF_SIZE 2048
 
@@ -192,7 +191,6 @@ typedef struct jpegencode_t
 } JPEGENCODE;
 
 #ifdef __cplusplus
-#define JPEG_STATIC static
 //
 // The JPEGENC class wraps portable C code which does the actual work
 //
@@ -212,8 +210,6 @@ class JPEGENC
   private:
     JPEGE_IMAGE _jpeg;
 };
-#else
-#define JPEG_STATIC
 #endif
 
 #ifdef __cplusplus
