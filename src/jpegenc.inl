@@ -64,7 +64,7 @@ typedef uint32_t jpege_biguint_t;
 
 // Returns the magnitude and fixes negative values for JPEG encoding
 // Upper 16 bits is the new delta value, lower 16 is the magnitude
-const uint32_t ulMagnitudeFix[2048] PROGMEM = {
+static const uint32_t ulMagnitudeFix[2048] PROGMEM = {
     0x03ff000b, 0x0000000a, 0x0001000a, 0x0002000a, 0x0003000a, 0x0004000a, 0x0005000a, 0x0006000a,
     0x0007000a, 0x0008000a, 0x0009000a, 0x000a000a, 0x000b000a, 0x000c000a, 0x000d000a, 0x000e000a,
     0x000f000a, 0x0010000a, 0x0011000a, 0x0012000a, 0x0013000a, 0x0014000a, 0x0015000a, 0x0016000a,
@@ -322,7 +322,7 @@ const uint32_t ulMagnitudeFix[2048] PROGMEM = {
     0x03f0000a, 0x03f1000a, 0x03f2000a, 0x03f3000a, 0x03f4000a, 0x03f5000a, 0x03f6000a, 0x03f7000a,
     0x03f8000a, 0x03f9000a, 0x03fa000a, 0x03fb000a, 0x03fc000a, 0x03fd000a, 0x03fe000a, 0x03ff000a};
 
-const unsigned char cMagnitudes[512] PROGMEM = {0,1,2,2,3,3,3,3,4,4,4,4,4,4,4,4,
+static const unsigned char cMagnitudes[512] PROGMEM = {0,1,2,2,3,3,3,3,4,4,4,4,4,4,4,4,
     5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,
     6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,
     6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,
@@ -355,7 +355,7 @@ const unsigned char cMagnitudes[512] PROGMEM = {0,1,2,2,3,3,3,3,4,4,4,4,4,4,4,4,
     9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,
     9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9};
 // zigzag ordering of DCT coefficients
-const unsigned char cZigZag[64] PROGMEM = {0,1,5,6,14,15,27,28,
+static const unsigned char cZigZag[64] PROGMEM = {0,1,5,6,14,15,27,28,
     2,4,7,13,16,26,29,42,
     3,8,12,17,25,30,41,43,
     9,11,18,24,31,40,44,53,
@@ -363,7 +363,7 @@ const unsigned char cZigZag[64] PROGMEM = {0,1,5,6,14,15,27,28,
     20,22,33,38,46,51,55,60,
     21,34,37,47,50,56,59,61,
     35,36,48,49,57,58,62,63};
-const unsigned char cZigZag2[64] PROGMEM = {0,1,8,16,9,2,3,10,
+static const unsigned char cZigZag2[64] PROGMEM = {0,1,8,16,9,2,3,10,
     17,24,32,25,18,11,4,5,
     12,19,26,33,40,48,41,34,
     27,20,13,6,7,14,21,28,
@@ -374,14 +374,14 @@ const unsigned char cZigZag2[64] PROGMEM = {0,1,8,16,9,2,3,10,
 //
 // Typical DC difference huffman tables for luminance and chrominance
 //
-const unsigned char huffl_dc[28] PROGMEM = {0,1,5,1,1,1,1,1,1,0,0,0,0,0,0,0,
+static const unsigned char huffl_dc[28] PROGMEM = {0,1,5,1,1,1,1,1,1,0,0,0,0,0,0,0,
     0,1,2,3,4,5,6,7,8,9,0xa,0xb};
-const unsigned char huffcr_dc[28] PROGMEM = {0,3,1,1,1,1,1,1,1,1,1,0,0,0,0,0,
+static const unsigned char huffcr_dc[28] PROGMEM = {0,3,1,1,1,1,1,1,1,1,1,0,0,0,0,0,
     0,1,2,3,4,5,6,7,8,9,0xa,0xb};
 //
 // Typical AC difference huffman tables for luminance and chrominance
 //
-const unsigned char huffl_ac[256] PROGMEM = {0,2,1,3,3,2,4,3,5,5,4,4,0,0,1,0x7d,
+static const unsigned char huffl_ac[256] PROGMEM = {0,2,1,3,3,2,4,3,5,5,4,4,0,0,1,0x7d,
     1,2,3,0,4,0x11,5,0x12,0x21,0x31,0x41,6,0x13,0x51,0x61,7,
     0x22,0x71,0x14,0x32,0x81,0x91,0xa1,8,0x23,0x42,0xb1,0xc1,0x15,0x52,0xd1,0xf0,
     0x24,0x33,0x62,0x72,0x82,9,0xa,0x16,0x17,0x18,0x19,0x1a,0x25,0x26,0x27,0x28,
@@ -393,7 +393,7 @@ const unsigned char huffl_ac[256] PROGMEM = {0,2,1,3,3,2,4,3,5,5,4,4,0,0,1,0x7d,
     0xc6,0xc7,0xc8,0xc9,0xca,0xd2,0xd3,0xd4,0xd5,0xd6,0xd7,0xd8,0xd9,0xda,0xe1,0xe2,
     0xe3,0xe4,0xe5,0xe6,0xe7,0xe8,0xe9,0xea,0xf1,0xf2,0xf3,0xf4,0xf5,0xf6,0xf7,0xf8,
     0xf9,0xfa};
-const unsigned char huffcr_ac[256] PROGMEM = {0,2,1,2,4,4,3,4,7,5,4,4,0,1,2,0x77,
+static const unsigned char huffcr_ac[256] PROGMEM = {0,2,1,2,4,4,3,4,7,5,4,4,0,1,2,0x77,
     0,1,2,3,0x11,4,5,0x21,0x31,6,0x12,0x41,0x51,7,0x61,0x71,
     0x13,0x22,0x32,0x81,0x8,0x14,0x42,0x91,0xa1,0xb1,0xc1,9,0x23,0x33,0x52,0xf0,
     0x15,0x62,0x72,0xd1,0xa,0x16,0x24,0x34,0xe1,0x25,0xf1,0x17,0x18,0x19,0x1a,0x26,
@@ -407,19 +407,19 @@ const unsigned char huffcr_ac[256] PROGMEM = {0,2,1,2,4,4,3,4,7,5,4,4,0,1,2,0x77
     0xf9,0xfa};
 // Sample quantization table which can be divided by 2 or 4 or multiplied by 2
 // to give different quality levels
-const unsigned char quant_lum[64] PROGMEM =
+static const unsigned char quant_lum[64] PROGMEM =
 {16,11,12,14,12,10,16,14,13,14,18,17,16,19,24,
     40,26,24,22,22,24,49,35,37,29,40,58,51,61,60,
     57,51,56,55,64,72,92,78,64,68,87,69,55,56,80,
     109,81,87,95,98,103,104,103,62,77,113,121,112,
     100,120,92,101,103,99};
-const unsigned char quant_color[64] PROGMEM =
+static const unsigned char quant_color[64] PROGMEM =
 {17,18,18,24,21,24,47,26,26,47,99,66,56,66,99,99,
     99,99,99,99,99,99,99,99,99,99,99,99,99,99,99,99,
     99,99,99,99,99,99,99,99,99,99,99,99,99,99,99,99,
     99,99,99,99,99,99,99,99,99,99,99,99,99,99,99,99};
 
-const unsigned char quant95_lum[64] PROGMEM =
+static const unsigned char quant95_lum[64] PROGMEM =
 { 0x02, 0x01, 0x01, 0x01, 0x01, 0x01, 0x02, 0x01,
     0x01, 0x01, 0x02, 0x02, 0x02, 0x02, 0x02, 0x04,
     0x03, 0x02, 0x02, 0x02, 0x02, 0x05, 0x04, 0x04,
@@ -428,7 +428,7 @@ const unsigned char quant95_lum[64] PROGMEM =
     0x09, 0x07, 0x06, 0x06, 0x08, 0x0b, 0x08, 0x09,
     0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x06, 0x08, 0x0b,
     0x0c, 0x0b, 0x0a, 0x0c, 0x09, 0x0a, 0x0a, 0x0a };
-const unsigned char quant95_color[64] PROGMEM =
+static const unsigned char quant95_color[64] PROGMEM =
 { 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x05, 0x03,
     0x03, 0x05, 0x0a, 0x07, 0x06, 0x07, 0x0a, 0x0a,
     0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x0a,
@@ -444,7 +444,7 @@ const unsigned char quant95_color[64] PROGMEM =
 // scalefactor[k] = cos(k*PI/16) * sqrt(2)    for k=1..7
 // For integer operation, the multiplier table is to be scaled by
 // IFAST_SCALE_BITS.
-const int iScaleBits[64] PROGMEM = {16384, 22725, 21407, 19266, 16384, 12873,  8867,  4520,
+static const int iScaleBits[64] PROGMEM = {16384, 22725, 21407, 19266, 16384, 12873,  8867,  4520,
     22725, 31521, 29692, 26722, 22725, 17855, 12299,  6270,
     21407, 29692, 27969, 25172, 21407, 16819, 11585,  5906,
     19266, 26722, 25172, 22654, 19266, 15137, 10426,  5315,
@@ -454,7 +454,7 @@ const int iScaleBits[64] PROGMEM = {16384, 22725, 21407, 19266, 16384, 12873,  8
     4520,  6270,  5906,  5315,  4520,  3552,  2446,  1247};
 
 // Pre-calculated Huffman encode tables (4K bytes)
-const uint8_t hufftable[] PROGMEM = {
+static const uint8_t hufftable[] PROGMEM = {
     0x00,0x00,0x02,0x00,0x03,0x00,0x04,0x00,0x05,0x00,0x06,0x00,0x0e,0x00,0x1e,0x00,
     0x3e,0x00,0x7e,0x00,0xfe,0x00,0xfe,0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
     0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
@@ -711,7 +711,7 @@ const uint8_t hufftable[] PROGMEM = {
     0x10,0x00,0x10,0x00,0x10,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
     0x0a,0x00,0x0f,0x00,0x10,0x00,0x10,0x00,0x10,0x00,0x10,0x00,0x10,0x00,0x10,0x00,
     0x10,0x00,0x10,0x00,0x10,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
-void JPEGFixQuantE(JPEGE_IMAGE *pJPEG)
+static void JPEGFixQuantE(JPEGE_IMAGE *pJPEG)
 {
     int iTable, iTableOffset;
     signed short sTemp[JPEGE_DCT_SIZE];
@@ -754,7 +754,7 @@ void JPEGFixQuantE(JPEGE_IMAGE *pJPEG)
     } // for iTable
 } /* JPEGFixQuantE() */
 
-void JPEGMakeHuffE(JPEGE_IMAGE *pJPEG)
+static void JPEGMakeHuffE(JPEGE_IMAGE *pJPEG)
 {
 #ifdef USE_RAM_FOR_TABLES
     int code, iLen, iTable;
@@ -1135,7 +1135,7 @@ int JPEGEncodeBegin(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, int iWidth, int iHe
     return JPEGE_SUCCESS;
 } /* JPEGEncodeBegin() */
 
-int JPEGQuantize(JPEGE_IMAGE *pJPEG, signed short *pMCUSrc, int iTable)
+static int JPEGQuantize(JPEGE_IMAGE *pJPEG, signed short *pMCUSrc, int iTable)
 {
     signed int d, sQ1, sQ2, sum;
     int i;
@@ -1181,7 +1181,7 @@ int JPEGQuantize(JPEGE_IMAGE *pJPEG, signed short *pMCUSrc, int iTable)
     return (sum == 0); // if the last half of the quantized results was 0, call it 'sparse'
 } /* JPEGQuantize() */
 
-int JPEGEncodeMCU(int iDCTable, JPEGE_IMAGE *pJPEG, signed short *pMCUData, int iDCPred, int bSparse)
+static int JPEGEncodeMCU(int iDCTable, JPEGE_IMAGE *pJPEG, signed short *pMCUData, int iDCPred, int bSparse)
 {
     //int iOff, iBitnum; // faster access
     unsigned char cMagnitude;
@@ -1278,7 +1278,7 @@ encodemcuz:
     
 } /* JPEGEncodeMCU() */
 
-void JPEGGetMCU(unsigned char *pSrc, int iPitch, signed char *pMCU)
+static void JPEGGetMCU(unsigned char *pSrc, int iPitch, signed char *pMCU)
 {
     int cy;
     
@@ -1290,7 +1290,7 @@ void JPEGGetMCU(unsigned char *pSrc, int iPitch, signed char *pMCU)
     }
 } /* JPEGGetMCU() */
 
-void JPEGSubSample24(unsigned char *pSrc, signed char *pLUM, signed char *pCb, signed char *pCr, int lsize, int cx, int cy)
+static void JPEGSubSample24(unsigned char *pSrc, signed char *pLUM, signed char *pCb, signed char *pCr, int lsize, int cx, int cy)
 {
     int x;
     unsigned char cRed, cGreen, cBlue;
@@ -1355,7 +1355,7 @@ void JPEGSubSample24(unsigned char *pSrc, signed char *pLUM, signed char *pCb, s
     } // for y
     
 } /* JPEGSubSample24() */
-void JPEGSubSample16(unsigned char *pSrc, signed char *pLUM, signed char *pCb, signed char *pCr, int lsize, int cx, int cy)
+static void JPEGSubSample16(unsigned char *pSrc, signed char *pLUM, signed char *pCb, signed char *pCr, int lsize, int cx, int cy)
 {
     int x, y;
     unsigned short us;
@@ -1426,7 +1426,7 @@ void JPEGSubSample16(unsigned char *pSrc, signed char *pLUM, signed char *pCb, s
     
 } /* JPEGSubSample16() */
 
-void JPEGSubSample32(unsigned char *pSrc, signed char *pLUM, signed char *pCb, signed char *pCr, int lsize, int cx, int cy)
+static void JPEGSubSample32(unsigned char *pSrc, signed char *pLUM, signed char *pCb, signed char *pCr, int lsize, int cx, int cy)
 {
     int x;
     unsigned char cRed, cGreen, cBlue;
@@ -1492,7 +1492,7 @@ void JPEGSubSample32(unsigned char *pSrc, signed char *pLUM, signed char *pCb, s
 
 } /* JPEGSubSample32() */
 
-void JPEGSample32(unsigned char *pSrc, signed char *pMCU, int lsize, int cx, int cy)
+static void JPEGSample32(unsigned char *pSrc, signed char *pMCU, int lsize, int cx, int cy)
 {
     int x, y;
     unsigned char cRed, cGreen, cBlue;
@@ -1528,7 +1528,7 @@ void JPEGSample32(unsigned char *pSrc, signed char *pMCU, int lsize, int cx, int
 // YUV422 is horizontally subsampled; this code takes the average of each
 // vertical pair of Cb/Cr and creates 4:2:0 from it
 //
-void JPEGSubSampleYUV422(uint8_t *pImage, int8_t *pMCUData, int iPitch)
+static void JPEGSubSampleYUV422(uint8_t *pImage, int8_t *pMCUData, int iPitch)
 {
 int x, y;
 uint8_t *pY0, *pY1, *pY2, *pY3;
@@ -1591,7 +1591,7 @@ uint32_t *pU32;
     }
 } /* JPEGSubSampleYUV422() */
 
-void JPEGGetMCU22(unsigned char *pImage, JPEGE_IMAGE *pPage, int iPitch)
+static void JPEGGetMCU22(unsigned char *pImage, JPEGE_IMAGE *pPage, int iPitch)
 {
     int cx, cy, width, height;
     signed char *pMCUData = pPage->MCUc;
@@ -1681,7 +1681,7 @@ void JPEGGetMCU22(unsigned char *pImage, JPEGE_IMAGE *pPage, int iPitch)
  *  PURPOSE    : Sample a 8x8 color block                                   *
  *                                                                          *
  ****************************************************************************/
-void JPEGSample16(unsigned char *pSrc, signed char *pMCU, int lsize, int cx, int cy)
+static void JPEGSample16(unsigned char *pSrc, signed char *pMCU, int lsize, int cx, int cy)
 {
     int x, y;
     unsigned short us;
@@ -1719,7 +1719,7 @@ void JPEGSample16(unsigned char *pSrc, signed char *pMCU, int lsize, int cx, int
  *  PURPOSE    : Sample a 8x8 color block                                   *
  *                                                                          *
  ****************************************************************************/
-void JPEGSample24(unsigned char *pSrc, signed char *pMCU, int lsize, int cx, int cy)
+static void JPEGSample24(unsigned char *pSrc, signed char *pMCU, int lsize, int cx, int cy)
 {
     int x;
     unsigned char cRed, cGreen, cBlue;
@@ -1748,7 +1748,7 @@ void JPEGSample24(unsigned char *pSrc, signed char *pMCU, int lsize, int cx, int
     
 } /* JPEGSample24() */
 
-void JPEGGetMCU11(unsigned char *pImage, JPEGE_IMAGE *pPage, int iPitch)
+static void JPEGGetMCU11(unsigned char *pImage, JPEGE_IMAGE *pPage, int iPitch)
 {
     int cx, cy;
     signed char *pMCUData = pPage->MCUc;
@@ -1824,7 +1824,7 @@ static void JPEGGetYUV422YCbCr(const uint8_t *pRow, int x, int width, int *pY, i
     *pCr = pRow[pair_x * 2 + 3];
 } /* JPEGGetYUV422YCbCr() */
 
-void JPEGLoadEdgeMCU(const uint8_t *pImage, JPEGE_IMAGE *pPage, int iPitch, int width, int height)
+static void JPEGLoadEdgeMCU(const uint8_t *pImage, JPEGE_IMAGE *pPage, int iPitch, int width, int height)
 {
     signed char *pMCUData = pPage->MCUc;
     int bytes_per_pixel;
@@ -1997,7 +1997,7 @@ static void JPEGLoadNV12(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, const uint8_t 
     }
 } /* JPEGLoadNV12() */
 
-void JPEGFDCT(signed char *pMCUSrc, signed short *pMCUDest)
+static void JPEGFDCT(signed char *pMCUSrc, signed short *pMCUDest)
 {
     int iCol;
     int iRow;
@@ -2080,7 +2080,7 @@ void JPEGFDCT(signed char *pMCUSrc, signed short *pMCUDest)
     } // for each column
 } /* JPEGFDCT() */
 
-void FlushCode(PIL_CODE *pPC)
+static void FlushCode(PIL_CODE *pPC)
 {
     unsigned char c;
    
