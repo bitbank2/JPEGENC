@@ -235,10 +235,4 @@ int JPEGGetLastError(JPEGE_IMAGE *pJPEG);
 }
 #endif
 
-// Due to unaligned memory causing an exception, we have to do these macros the slow way
-#define INTELSHORT(p) ((*p) + (*(p+1)<<8))
-#define INTELLONG(p) ((*p) + (*(p+1)<<8) + (*(p+2)<<16) + (*(p+3)<<24))
-#define MOTOSHORT(p) (((*(p))<<8) + (*(p+1)))
-#define MOTOLONG(p) (((*p)<<24) + ((*(p+1))<<16) + ((*(p+2))<<8) + (*(p+3)))
-
 #endif // __JPEGENC__
