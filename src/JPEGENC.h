@@ -52,8 +52,6 @@
 
 #if (INTPTR_MAX == INT64_MAX)
 #define JPEGE_REGISTER_WIDTH 64
-#define BIGINT int64_t
-#define BIGUINT uint64_t
 // structure for outputting variable length codes
 typedef struct pil_code_tag
 {
@@ -61,21 +59,8 @@ unsigned char *pOut; // current output pointer
 int64_t iLen;  // length of data in accumulator
 uint64_t ulAcc; // code accumulator (holds codes until at least 64-bits ready to write
 } PIL_CODE;
-#define STORECODE(pOut, iLen, ulCode, ulAcc, iNewLen) \
-        if (iLen+iNewLen > 64) \
-                                                { uint64_t ul1, ul2 = ulAcc | (ulCode >> (iLen+iNewLen-64)); \
-        ul1 = ul2 & (ul2 >> 4); ul1 &= (ul1 >> 2); ul1 &= (ul1 >> 1);  ul1 &= 0x0101010101010101; \
-    if (ul1 == 0) \
-        {*(uint64_t *)pOut = __builtin_bswap64(ul2); pOut += 8; \
-     iLen -= 64; ulAcc = 0;} else \
-        {while (iLen >= 8) \
-            {unsigned char c = (unsigned char)(ulAcc >> 56); *pOut++ = c; \
-            if (c == 0xff) { *pOut++ = 0;} ulAcc <<= 8; iLen -= 8; }}} \
-        iLen += iNewLen; ulAcc |= (ulCode << (64-iLen));
 #else
 #define JPEGE_REGISTER_WIDTH 32
-#define BIGINT int32_t
-#define BIGUINT uint32_t
 // structure for outputting variable length codes
 typedef struct pil_code_tag
 {
@@ -84,15 +69,8 @@ int32_t iLen;  // length of data in accumulator
 uint32_t ulAcc; // code accumulator (holds codes until at least 32-bits ready to write
 } PIL_CODE;
 // 32-bit output stage assumes that unaligned writes are not allowed
-#define STORECODE(pOut, iLen, ulCode, ulAcc, iNewLen) \
-        if (iLen+iNewLen > 32) { while (iLen >= 8) \
-                        {unsigned char c = (unsigned char)(ulAcc >> 24); *pOut++ = c; \
-        if (c == 0xff) { *pOut++ = 0;} ulAcc <<= 8; iLen -= 8; }} \
-        iLen += iNewLen; ulAcc |= (ulCode << (32-iLen));
 #endif
 
-#define WRITEMOTO32(p, o, val) {uint32_t l = val; p[o] = (unsigned char)(l >> 24); p[o+1] = (unsigned char)(l >> 16); p[o+2] = (unsigned char)(l >> 8); p[o+3] = (unsigned char)l;}
-#define WRITEMOTO16(p, o, val) {uint32_t l = val; p[o] = (unsigned char)(l >> 8); p[o+1] = (unsigned char)l;}
 
 // Error codes returned by getLastError()
 enum {

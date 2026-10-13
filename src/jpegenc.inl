@@ -19,6 +19,49 @@
 // limitations under the License.
 //===========================================================================
 //
+// Private entropy-coding and byte-output helpers.
+#if JPEGE_REGISTER_WIDTH == 64
+typedef int64_t jpege_bigint_t;
+typedef uint64_t jpege_biguint_t;
+#define JPEGE_STORE_CODE(pOut, iLen, ulCode, ulAcc, iNewLen) \
+        if (iLen+iNewLen > 64) \
+                                                { uint64_t ul1, ul2 = ulAcc | (ulCode >> (iLen+iNewLen-64)); \
+        ul1 = ul2 & (ul2 >> 4); ul1 &= (ul1 >> 2); ul1 &= (ul1 >> 1);  ul1 &= 0x0101010101010101; \
+    if (ul1 == 0) \
+        {*(uint64_t *)pOut = __builtin_bswap64(ul2); pOut += 8; \
+     iLen -= 64; ulAcc = 0;} else \
+        {while (iLen >= 8) \
+            {unsigned char c = (unsigned char)(ulAcc >> 56); *pOut++ = c; \
+            if (c == 0xff) { *pOut++ = 0;} ulAcc <<= 8; iLen -= 8; }}} \
+        iLen += iNewLen; ulAcc |= (ulCode << (64-iLen));
+#else
+typedef int32_t jpege_bigint_t;
+typedef uint32_t jpege_biguint_t;
+#define JPEGE_STORE_CODE(pOut, iLen, ulCode, ulAcc, iNewLen) \
+        if (iLen+iNewLen > 32) { while (iLen >= 8) \
+                        {unsigned char c = (unsigned char)(ulAcc >> 24); *pOut++ = c; \
+        if (c == 0xff) { *pOut++ = 0;} ulAcc <<= 8; iLen -= 8; }} \
+        iLen += iNewLen; ulAcc |= (ulCode << (32-iLen));
+#endif
+
+#define JPEGE_WRITE_BE16(p, offset, value) do { \
+    uint8_t *jpege_p_ = (p); \
+    int jpege_offset_ = (offset); \
+    uint16_t jpege_value_ = (uint16_t)(value); \
+    jpege_p_[jpege_offset_] = (uint8_t)(jpege_value_ >> 8); \
+    jpege_p_[jpege_offset_ + 1] = (uint8_t)jpege_value_; \
+} while (0)
+
+#define JPEGE_WRITE_BE32(p, offset, value) do { \
+    uint8_t *jpege_p_ = (p); \
+    int jpege_offset_ = (offset); \
+    uint32_t jpege_value_ = (uint32_t)(value); \
+    jpege_p_[jpege_offset_] = (uint8_t)(jpege_value_ >> 24); \
+    jpege_p_[jpege_offset_ + 1] = (uint8_t)(jpege_value_ >> 16); \
+    jpege_p_[jpege_offset_ + 2] = (uint8_t)(jpege_value_ >> 8); \
+    jpege_p_[jpege_offset_ + 3] = (uint8_t)jpege_value_; \
+} while (0)
+
 // Returns the magnitude and fixes negative values for JPEG encoding
 // Upper 16 bits is the new delta value, lower 16 is the magnitude
 const uint32_t ulMagnitudeFix[2048] PROGMEM = {
@@ -868,24 +911,24 @@ int JPEGEncodeBegin(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, int iWidth, int iHe
         pJPEG->ucNumComponents = 1;
     else
         pJPEG->ucNumComponents = 3;
-    WRITEMOTO32(pBuf, iOffset, 0xffd8ffe0); // write app0 marker
+    JPEGE_WRITE_BE32(pBuf, iOffset, 0xffd8ffe0); // write app0 marker
     iOffset += 4;
-    WRITEMOTO32(pBuf, iOffset, 0x00104a46); // JFIF
+    JPEGE_WRITE_BE32(pBuf, iOffset, 0x00104a46); // JFIF
     iOffset += 4;
-    WRITEMOTO32(pBuf, iOffset, 0x49460001);
+    JPEGE_WRITE_BE32(pBuf, iOffset, 0x49460001);
     iOffset += 4;
-    WRITEMOTO16(pBuf, iOffset, 0x0101); // resolution units = dots per inch
+    JPEGE_WRITE_BE16(pBuf, iOffset, 0x0101); // resolution units = dots per inch
     iOffset += 2;
-    WRITEMOTO16(pBuf, iOffset, 0); // DEBUG - store spacial resolution as 0 for now
+    JPEGE_WRITE_BE16(pBuf, iOffset, 0); // DEBUG - store spacial resolution as 0 for now
     iOffset += 2;
-    WRITEMOTO16(pBuf, iOffset, 0);
+    JPEGE_WRITE_BE16(pBuf, iOffset, 0);
     iOffset += 2;
-    WRITEMOTO16(pBuf, iOffset, 0); // add 2 zeros
+    JPEGE_WRITE_BE16(pBuf, iOffset, 0); // add 2 zeros
     iOffset += 2;
     // define quantization tables
-    WRITEMOTO16(pBuf, iOffset, 0xffdb); // quantization table marker
+    JPEGE_WRITE_BE16(pBuf, iOffset, 0xffdb); // quantization table marker
     iOffset += 2;
-    WRITEMOTO16(pBuf, iOffset, 0x0043); // table size
+    JPEGE_WRITE_BE16(pBuf, iOffset, 0x0043); // table size
     iOffset += 2;
     pBuf[iOffset++] = 0; // table type and number 0,8 bit
     for (i=0; i<64; i++)
@@ -912,9 +955,9 @@ int JPEGEncodeBegin(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, int iWidth, int iHe
     }
     if (pJPEG->ucPixelType != JPEGE_PIXEL_GRAYSCALE) // add color quant tables
     {
-        WRITEMOTO16(pBuf, iOffset, 0xffdb); // quantization table
+        JPEGE_WRITE_BE16(pBuf, iOffset, 0xffdb); // quantization table
         iOffset += 2;
-        WRITEMOTO16(pBuf, iOffset, 0x0043); // table size
+        JPEGE_WRITE_BE16(pBuf, iOffset, 0x0043); // table size
         iOffset += 2;
         pBuf[iOffset++] = 1;  // table 1, 8 bit
         for (i=0; i<64; i++)
@@ -945,28 +988,28 @@ int JPEGEncodeBegin(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, int iWidth, int iHe
         i = (pJPEG->iWidth + 15) / 16; // number of MCUs in a row
     else
         i = (pJPEG->iWidth + 7) / 8;
-    WRITEMOTO16(pBuf, iOffset, 0xffdd); // DRI marker
+    JPEGE_WRITE_BE16(pBuf, iOffset, 0xffdd); // DRI marker
     iOffset += 2;
-    WRITEMOTO16(pBuf, iOffset, 4); // fixed length of 4
+    JPEGE_WRITE_BE16(pBuf, iOffset, 4); // fixed length of 4
     iOffset += 2;
-    WRITEMOTO16(pBuf, iOffset, i); // restart interval count
+    JPEGE_WRITE_BE16(pBuf, iOffset, i); // restart interval count
     iOffset += 2;
     
     // store the frame header
-    WRITEMOTO16(pBuf, iOffset, 0xffc0); // SOF0 marker
+    JPEGE_WRITE_BE16(pBuf, iOffset, 0xffc0); // SOF0 marker
     iOffset += 2;
     if (pJPEG->ucPixelType == JPEGE_PIXEL_GRAYSCALE)
     {
         pBuf[iOffset++] = 0;
         pBuf[iOffset++] = 11; // length = 11
         pBuf[iOffset++] = 8;   // sample precision
-        WRITEMOTO16(pBuf, iOffset, pJPEG->iHeight); // image height
+        JPEGE_WRITE_BE16(pBuf, iOffset, pJPEG->iHeight); // image height
         iOffset += 2;
-        WRITEMOTO16(pBuf, iOffset, pJPEG->iWidth); // image width
+        JPEGE_WRITE_BE16(pBuf, iOffset, pJPEG->iWidth); // image width
         iOffset += 2;
         pBuf[iOffset++] = 1; // number of components = 1 (grayscale)
         pBuf[iOffset++] = 0; // component number
-        WRITEMOTO16(pBuf, iOffset, 0x1100); // subsampling and quant table selector
+        JPEGE_WRITE_BE16(pBuf, iOffset, 0x1100); // subsampling and quant table selector
         iOffset += 2;
     }
     else  // set up color stuff
@@ -974,68 +1017,68 @@ int JPEGEncodeBegin(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, int iWidth, int iHe
         pBuf[iOffset++] = 0;
         pBuf[iOffset++] = 17; // length = 17
         pBuf[iOffset++] = 8;   // sample precision
-        WRITEMOTO16(pBuf, iOffset, pJPEG->iHeight); // image height
+        JPEGE_WRITE_BE16(pBuf, iOffset, pJPEG->iHeight); // image height
         iOffset += 2;
-        WRITEMOTO16(pBuf, iOffset, pJPEG->iWidth); // image width
+        JPEGE_WRITE_BE16(pBuf, iOffset, pJPEG->iWidth); // image width
         iOffset += 2;
         pBuf[iOffset++] = 3; // number of components = 3 (Ycc)
         pBuf[iOffset++] = 0; // component number 0 (Y)
         if (pJPEG->ucSubSample == JPEGE_SUBSAMPLE_420)
         {
-            WRITEMOTO16(pBuf, iOffset, 0x2200); // 2:1 subsampling and quant table selector
+            JPEGE_WRITE_BE16(pBuf, iOffset, 0x2200); // 2:1 subsampling and quant table selector
         }
         else
         {
-            WRITEMOTO16(pBuf, iOffset, 0x1100); // no subsampling and quant table selector
+            JPEGE_WRITE_BE16(pBuf, iOffset, 0x1100); // no subsampling and quant table selector
         }
         iOffset += 2;
         pBuf[iOffset++] = 1; // component number 1 (Cb)
-        WRITEMOTO16(pBuf, iOffset, 0x1101); // subsampling and quant table selector
+        JPEGE_WRITE_BE16(pBuf, iOffset, 0x1101); // subsampling and quant table selector
         iOffset += 2;
         pBuf[iOffset++] = 2; // component number 2 (Cr)
-        WRITEMOTO16(pBuf, iOffset, 0x1101); // subsampling and quant table selector
+        JPEGE_WRITE_BE16(pBuf, iOffset, 0x1101); // subsampling and quant table selector
         iOffset += 2;
     }
     // define Huffman tables
-    WRITEMOTO16(pBuf, iOffset, 0xffc4); // Huffman DC table
+    JPEGE_WRITE_BE16(pBuf, iOffset, 0xffc4); // Huffman DC table
     iOffset += 2;
-    WRITEMOTO16(pBuf, iOffset, 0x1f); // Table length = 31
+    JPEGE_WRITE_BE16(pBuf, iOffset, 0x1f); // Table length = 31
     iOffset += 2;
     pBuf[iOffset++] = 0; // table class = 0 (DC), id = 0
     memcpy(&pBuf[iOffset], huffl_dc, 28); // copy DC table
     iOffset += 28;
     // now the AC table
-    WRITEMOTO16(pBuf, iOffset, 0xffc4); // Huffman AC table
+    JPEGE_WRITE_BE16(pBuf, iOffset, 0xffc4); // Huffman AC table
     iOffset += 2;
-    WRITEMOTO16(pBuf, iOffset, 0xb5); // Table length = 181
+    JPEGE_WRITE_BE16(pBuf, iOffset, 0xb5); // Table length = 181
     iOffset += 2;
     pBuf[iOffset++] = 0x10; // table class = 1 (AC), id = 0
     memcpy(&pBuf[iOffset], huffl_ac, 178); // copy AC table
     iOffset += 178;
     if (pJPEG->ucPixelType != JPEGE_PIXEL_GRAYSCALE) // define a second set of tables for color
     {
-        WRITEMOTO16(pBuf, iOffset, 0xffc4); // Huffman DC table
+        JPEGE_WRITE_BE16(pBuf, iOffset, 0xffc4); // Huffman DC table
         iOffset += 2;
-        WRITEMOTO16(pBuf, iOffset, 0x1f); // Table length = 31
+        JPEGE_WRITE_BE16(pBuf, iOffset, 0x1f); // Table length = 31
         iOffset += 2;
         pBuf[iOffset++] = 1; // table class = 0 (DC), id = 1
         memcpy(&pBuf[iOffset], huffcr_dc, 28); // copy DC table
         iOffset += 28;
         // now the AC table
-        WRITEMOTO16(pBuf, iOffset, 0xffc4); // Huffman AC table
+        JPEGE_WRITE_BE16(pBuf, iOffset, 0xffc4); // Huffman AC table
         iOffset += 2;
-        WRITEMOTO16(pBuf, iOffset, 0xb5); // Table length = 181
+        JPEGE_WRITE_BE16(pBuf, iOffset, 0xb5); // Table length = 181
         iOffset += 2;
         pBuf[iOffset++] = 0x11; // table class = 1 (AC), id = 1
         memcpy(&pBuf[iOffset], huffcr_ac, 178); // copy AC table
         iOffset += 178;
     }
     // Define the start of scan header (SOS)
-    WRITEMOTO16(pBuf, iOffset, 0xffda); // SOS
+    JPEGE_WRITE_BE16(pBuf, iOffset, 0xffda); // SOS
     iOffset += 2;
     if (pJPEG->ucPixelType == JPEGE_PIXEL_GRAYSCALE)
     {
-        WRITEMOTO16(pBuf, iOffset, 0x8); // Table length = 8
+        JPEGE_WRITE_BE16(pBuf, iOffset, 0x8); // Table length = 8
         iOffset += 2;
         pBuf[iOffset++] = 1;            // number of components in scan = 1 (grayscale)
         pBuf[iOffset++] = 0; // component id = 0
@@ -1043,7 +1086,7 @@ int JPEGEncodeBegin(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, int iWidth, int iHe
     }
     else // color
     {
-        WRITEMOTO16(pBuf, iOffset, 0xc); // Table length = 12
+        JPEGE_WRITE_BE16(pBuf, iOffset, 0xc); // Table length = 12
         iOffset += 2;
         pBuf[iOffset++] = 3;            // number of components in scan = 3 (color)
         pBuf[iOffset++] = 0; // component id = 0
@@ -1144,12 +1187,12 @@ int JPEGEncodeMCU(int iDCTable, JPEGE_IMAGE *pJPEG, signed short *pMCUData, int 
     unsigned char cMagnitude;
     unsigned char ucCode, *pZig, *pZigEnd, *pZigStart;
     int iZeroCount;
-    BIGINT iDelta;
-    BIGUINT iLen, iNewLen;
+    jpege_bigint_t iDelta;
+    jpege_biguint_t iLen, iNewLen;
     unsigned short *pHuff;
-    BIGUINT ulCode;
+    jpege_biguint_t ulCode;
     unsigned char *pOut;
-    BIGUINT ulAcc;
+    jpege_biguint_t ulAcc;
     uint32_t ulMagVal;
     uint32_t *pMagFix = (uint32_t *)&ulMagnitudeFix[1024]; // allows indexing positive and negative values - speeds up total encode time by 15%
     
@@ -1176,11 +1219,11 @@ int JPEGEncodeMCU(int iDCTable, JPEGE_IMAGE *pJPEG, signed short *pMCUData, int 
     //      {
     //      cMagnitude = cMagnitudes[iDelta];
     //      }
-    ulCode = (BIGUINT) pHuff[cMagnitude];
+    ulCode = (jpege_biguint_t) pHuff[cMagnitude];
     iNewLen = pHuff[cMagnitude + 256];
     ulCode = (ulCode << cMagnitude) | iDelta; // code in msb, followed by delta
     iNewLen += cMagnitude; // add lengths together
-    STORECODE(pOut, iLen, ulCode, ulAcc, iNewLen)
+    JPEGE_STORE_CODE(pOut, iLen, ulCode, ulAcc, iNewLen)
     // Encode the AC components
     pZig = (unsigned char *)&cZigZag2[1];
     if (bSparse)
@@ -1197,9 +1240,9 @@ int JPEGEncodeMCU(int iDCTable, JPEGE_IMAGE *pJPEG, signed short *pMCUData, int 
         }
         if (pZig == pZigEnd) // special case, no more coefficients
         { // encode EOB (end of block)
-            ulCode = (BIGUINT) pHuff[0];
+            ulCode = (jpege_biguint_t) pHuff[0];
             iNewLen = pHuff[256];
-            STORECODE(pOut, iLen, ulCode, ulAcc, iNewLen)
+            JPEGE_STORE_CODE(pOut, iLen, ulCode, ulAcc, iNewLen)
             goto encodemcuz;
         }
         else // Encode a zero count and AC coefficient
@@ -1209,7 +1252,7 @@ int JPEGEncodeMCU(int iDCTable, JPEGE_IMAGE *pJPEG, signed short *pMCUData, int 
             { // 16 zeros is called ZRL (f0)
                 ulCode = (uint32_t)pHuff[0xf0];
                 iNewLen = pHuff[256 + 0xf0];
-                STORECODE(pOut, iLen, ulCode, ulAcc, iNewLen)
+                JPEGE_STORE_CODE(pOut, iLen, ulCode, ulAcc, iNewLen)
                 iZeroCount -= 16;
             }
             // Encode a normal RRRR/SSSS pair
@@ -1223,7 +1266,7 @@ int JPEGEncodeMCU(int iDCTable, JPEGE_IMAGE *pJPEG, signed short *pMCUData, int 
             ulCode = (ulCode << cMagnitude) | iDelta; // code followed by magnitude
             pZig++;  // skip to next coefficient
             iNewLen += cMagnitude;
-            STORECODE(pOut, iLen, ulCode, ulAcc, iNewLen)
+            JPEGE_STORE_CODE(pOut, iLen, ulCode, ulAcc, iNewLen)
         }
     }
     
