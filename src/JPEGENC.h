@@ -46,12 +46,12 @@
 /* Defines and variables */
 #define JPEGE_FILE_BUF_SIZE 2048
 
-#ifndef DCTSIZE
-#define DCTSIZE 64
+#ifndef JPEGE_DCT_SIZE
+#define JPEGE_DCT_SIZE 64
 #endif
 
 #if (INTPTR_MAX == INT64_MAX)
-#define REGISTER_WIDTH 64
+#define JPEGE_REGISTER_WIDTH 64
 #define BIGINT int64_t
 #define BIGUINT uint64_t
 // structure for outputting variable length codes
@@ -73,7 +73,7 @@ uint64_t ulAcc; // code accumulator (holds codes until at least 64-bits ready to
             if (c == 0xff) { *pOut++ = 0;} ulAcc <<= 8; iLen -= 8; }}} \
         iLen += iNewLen; ulAcc |= (ulCode << (64-iLen));
 #else
-#define REGISTER_WIDTH 32
+#define JPEGE_REGISTER_WIDTH 32
 #define BIGINT int32_t
 #define BIGUINT uint32_t
 // structure for outputting variable length codes
@@ -172,9 +172,9 @@ typedef struct jpege_image_tag
     int iDCPred0, iDCPred1, iDCPred2; // DC predictor values for the 3 color components
     PIL_CODE pc;
     int *huffdc[2];
-    signed short sQuantTable[DCTSIZE*4];
-    signed char MCUc[6*DCTSIZE]; // captured image data
-    signed short MCUs[DCTSIZE]; // final processed output
+    signed short sQuantTable[JPEGE_DCT_SIZE*4];
+    signed char MCUc[6*JPEGE_DCT_SIZE]; // captured image data
+    signed short MCUs[JPEGE_DCT_SIZE]; // final processed output
     JPEGE_READ_CALLBACK *pfnRead;
     JPEGE_WRITE_CALLBACK *pfnWrite;
     JPEGE_SEEK_CALLBACK *pfnSeek;

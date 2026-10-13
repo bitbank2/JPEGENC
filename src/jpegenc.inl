@@ -671,7 +671,7 @@ const uint8_t hufftable[] PROGMEM = {
 void JPEGFixQuantE(JPEGE_IMAGE *pJPEG)
 {
     int iTable, iTableOffset;
-    signed short sTemp[DCTSIZE];
+    signed short sTemp[JPEGE_DCT_SIZE];
     int i, iCount;
     signed short *p;
     unsigned short *pus;
@@ -683,30 +683,30 @@ void JPEGFixQuantE(JPEGE_IMAGE *pJPEG)
     
     for (iTable = 0; iTable < iCount; iTable++)
     {
-        iTableOffset = iTable * DCTSIZE;
+        iTableOffset = iTable * JPEGE_DCT_SIZE;
         p = (signed short *) &pJPEG->sQuantTable[iTableOffset];
-        for (i = 0; i < DCTSIZE; i++)
+        for (i = 0; i < JPEGE_DCT_SIZE; i++)
         {
             sTemp[i] = p[cZigZag[i]];
         }
-        memcpy(&pJPEG->sQuantTable[iTableOffset], sTemp, DCTSIZE*sizeof(short)); // copy back to original spot
+        memcpy(&pJPEG->sQuantTable[iTableOffset], sTemp, JPEGE_DCT_SIZE*sizeof(short)); // copy back to original spot
         
         // Prescale for DCT multiplication
         p = (signed short *) &pJPEG->sQuantTable[iTableOffset];
-        for (i = 0; i < DCTSIZE; i++)
+        for (i = 0; i < JPEGE_DCT_SIZE; i++)
         {
             p[i] = (short) ((p[i] * iScaleBits[i]) >> 11);
         }
         // Create "inverted" values for quicker multiplication instead of division
         pus = (unsigned short *) &pJPEG->sQuantTable[iTableOffset];
-        for (i = 0; i < DCTSIZE; i++)
+        for (i = 0; i < JPEGE_DCT_SIZE; i++)
         {
             int j;
             if (pus[i] != 0)
                 j = 65536 / pus[i];
             else
                 j = 0;
-            pus[i+(DCTSIZE*2)] = (unsigned short)j;
+            pus[i+(JPEGE_DCT_SIZE*2)] = (unsigned short)j;
         }
     } // for iTable
 } /* JPEGFixQuantE() */
@@ -1098,7 +1098,7 @@ int JPEGQuantize(JPEGE_IMAGE *pJPEG, signed short *pMCUSrc, int iTable)
     int i;
     signed short *pQuant;
     
-    pQuant = (signed short *)&pJPEG->sQuantTable[iTable * DCTSIZE];
+    pQuant = (signed short *)&pJPEG->sQuantTable[iTable * JPEGE_DCT_SIZE];
     for (i=0; i<33; i++) // do first half and then check for second half being all 0's
     {
         sQ1 = pQuant[i];
@@ -1584,49 +1584,49 @@ void JPEGGetMCU22(unsigned char *pImage, JPEGE_IMAGE *pPage, int iPitch)
     else if (pPage->ucPixelType == JPEGE_PIXEL_RGB565)
     {
         // upper left
-        JPEGSubSample16(pImage, pMCUData, &pMCUData[DCTSIZE*4], &pMCUData[DCTSIZE*5], iPitch, cx, cy);
+        JPEGSubSample16(pImage, pMCUData, &pMCUData[JPEGE_DCT_SIZE*4], &pMCUData[JPEGE_DCT_SIZE*5], iPitch, cx, cy);
         // upper right
         if (width > 8)
-            JPEGSubSample16(pImage+8*2, &pMCUData[DCTSIZE*1], &pMCUData[4+DCTSIZE*4], &pMCUData[4+DCTSIZE*5], iPitch, width-8, cy);
+            JPEGSubSample16(pImage+8*2, &pMCUData[JPEGE_DCT_SIZE*1], &pMCUData[4+JPEGE_DCT_SIZE*4], &pMCUData[4+JPEGE_DCT_SIZE*5], iPitch, width-8, cy);
         if (height > 8)
         {
             // lower left
-            JPEGSubSample16(pImage+8*iPitch, &pMCUData[DCTSIZE*2], &pMCUData[32+DCTSIZE*4], &pMCUData[32+DCTSIZE*5], iPitch, cx, height - 8);
+            JPEGSubSample16(pImage+8*iPitch, &pMCUData[JPEGE_DCT_SIZE*2], &pMCUData[32+JPEGE_DCT_SIZE*4], &pMCUData[32+JPEGE_DCT_SIZE*5], iPitch, cx, height - 8);
             // lower right
             if (width > 8)
-                JPEGSubSample16(pImage+8*iPitch + 8*2, &pMCUData[DCTSIZE*3], &pMCUData[36+DCTSIZE*4], &pMCUData[36+DCTSIZE*5], iPitch, width - 8, height - 8);
+                JPEGSubSample16(pImage+8*iPitch + 8*2, &pMCUData[JPEGE_DCT_SIZE*3], &pMCUData[36+JPEGE_DCT_SIZE*4], &pMCUData[36+JPEGE_DCT_SIZE*5], iPitch, width - 8, height - 8);
         }
     }
     else if (pPage->ucPixelType == JPEGE_PIXEL_RGB888)
     {
         // upper left
-        JPEGSubSample24(pImage, pMCUData, &pMCUData[DCTSIZE*4], &pMCUData[DCTSIZE*5], iPitch, cx, cy);
+        JPEGSubSample24(pImage, pMCUData, &pMCUData[JPEGE_DCT_SIZE*4], &pMCUData[JPEGE_DCT_SIZE*5], iPitch, cx, cy);
         // upper right
         if (width > 8)
-            JPEGSubSample24(pImage+8*3, &pMCUData[DCTSIZE*1], &pMCUData[4+DCTSIZE*4], &pMCUData[4+DCTSIZE*5], iPitch, width-8, cy);
+            JPEGSubSample24(pImage+8*3, &pMCUData[JPEGE_DCT_SIZE*1], &pMCUData[4+JPEGE_DCT_SIZE*4], &pMCUData[4+JPEGE_DCT_SIZE*5], iPitch, width-8, cy);
         if (height > 8)
         {
             // lower left
-            JPEGSubSample24(pImage+8*iPitch, &pMCUData[DCTSIZE*2], &pMCUData[32+DCTSIZE*4], &pMCUData[32+DCTSIZE*5], iPitch, cx, height - 8);
+            JPEGSubSample24(pImage+8*iPitch, &pMCUData[JPEGE_DCT_SIZE*2], &pMCUData[32+JPEGE_DCT_SIZE*4], &pMCUData[32+JPEGE_DCT_SIZE*5], iPitch, cx, height - 8);
             // lower right
             if (width > 8)
-                JPEGSubSample24(pImage+8*iPitch + 8*3, &pMCUData[DCTSIZE*3], &pMCUData[36+DCTSIZE*4], &pMCUData[36+DCTSIZE*5], iPitch, width - 8, height - 8);
+                JPEGSubSample24(pImage+8*iPitch + 8*3, &pMCUData[JPEGE_DCT_SIZE*3], &pMCUData[36+JPEGE_DCT_SIZE*4], &pMCUData[36+JPEGE_DCT_SIZE*5], iPitch, width - 8, height - 8);
         }
     }
     else if (pPage->ucPixelType == JPEGE_PIXEL_ARGB8888)
     {
         // upper left
-        JPEGSubSample32(pImage, pMCUData, &pMCUData[DCTSIZE*4], &pMCUData[DCTSIZE*5], iPitch, cx, cy);
+        JPEGSubSample32(pImage, pMCUData, &pMCUData[JPEGE_DCT_SIZE*4], &pMCUData[JPEGE_DCT_SIZE*5], iPitch, cx, cy);
         // upper right
         if (width > 8)
-            JPEGSubSample32(pImage+8*4, &pMCUData[DCTSIZE*1], &pMCUData[4+DCTSIZE*4], &pMCUData[4+DCTSIZE*5], iPitch, width-8, cy);
+            JPEGSubSample32(pImage+8*4, &pMCUData[JPEGE_DCT_SIZE*1], &pMCUData[4+JPEGE_DCT_SIZE*4], &pMCUData[4+JPEGE_DCT_SIZE*5], iPitch, width-8, cy);
         if (height > 8)
         {
             // lower left
-            JPEGSubSample32(pImage+8*iPitch, &pMCUData[DCTSIZE*2], &pMCUData[32+DCTSIZE*4], &pMCUData[32+DCTSIZE*5], iPitch, cx, height - 8);
+            JPEGSubSample32(pImage+8*iPitch, &pMCUData[JPEGE_DCT_SIZE*2], &pMCUData[32+JPEGE_DCT_SIZE*4], &pMCUData[32+JPEGE_DCT_SIZE*5], iPitch, cx, height - 8);
             // lower right
             if (width > 8)
-                JPEGSubSample32(pImage+8*iPitch + 8*4, &pMCUData[DCTSIZE*3], &pMCUData[36+DCTSIZE*4], &pMCUData[36+DCTSIZE*5], iPitch, width - 8, height - 8);
+                JPEGSubSample32(pImage+8*iPitch + 8*4, &pMCUData[JPEGE_DCT_SIZE*3], &pMCUData[36+JPEGE_DCT_SIZE*4], &pMCUData[36+JPEGE_DCT_SIZE*5], iPitch, width - 8, height - 8);
         }
     }
 } /* JPEGGetMCU22() */
@@ -1818,8 +1818,8 @@ void JPEGLoadEdgeMCU(const uint8_t *pImage, JPEGE_IMAGE *pPage, int iPitch, int 
 
                 JPEGGetRGBYCbCr(&pImage[source_y * iPitch + source_x * bytes_per_pixel], pPage->ucPixelType, &iY, &iCb, &iCr);
                 pMCUData[offset] = (signed char)iY;
-                pMCUData[DCTSIZE + offset] = (signed char)(iCb >> 12);
-                pMCUData[DCTSIZE * 2 + offset] = (signed char)(iCr >> 12);
+                pMCUData[JPEGE_DCT_SIZE + offset] = (signed char)(iCb >> 12);
+                pMCUData[JPEGE_DCT_SIZE * 2 + offset] = (signed char)(iCr >> 12);
             }
         }
         return;
@@ -1853,16 +1853,16 @@ void JPEGLoadEdgeMCU(const uint8_t *pImage, JPEGE_IMAGE *pPage, int iPitch, int 
                     int block = ((pixel_y >> 3) << 1) + (pixel_x >> 3);
                     int offset = ((pixel_y & 7) << 3) + (pixel_x & 7);
 
-                    pMCUData[block * DCTSIZE + offset] = (signed char)iY[i];
+                    pMCUData[block * JPEGE_DCT_SIZE + offset] = (signed char)iY[i];
                 }
             }
 
             if (pPage->ucPixelType == JPEGE_PIXEL_YUV422) {
-                pMCUData[4 * DCTSIZE + (y >> 1) * 8 + (x >> 1)] = (signed char)(((iCb[0] + iCb[1] + iCb[2] + iCb[3] + 2) >> 2) - 0x80);
-                pMCUData[5 * DCTSIZE + (y >> 1) * 8 + (x >> 1)] = (signed char)(((iCr[0] + iCr[1] + iCr[2] + iCr[3] + 2) >> 2) - 0x80);
+                pMCUData[4 * JPEGE_DCT_SIZE + (y >> 1) * 8 + (x >> 1)] = (signed char)(((iCb[0] + iCb[1] + iCb[2] + iCb[3] + 2) >> 2) - 0x80);
+                pMCUData[5 * JPEGE_DCT_SIZE + (y >> 1) * 8 + (x >> 1)] = (signed char)(((iCr[0] + iCr[1] + iCr[2] + iCr[3] + 2) >> 2) - 0x80);
             } else {
-                pMCUData[4 * DCTSIZE + (y >> 1) * 8 + (x >> 1)] = (signed char)((iCb[0] + iCb[1] + iCb[2] + iCb[3]) >> 14);
-                pMCUData[5 * DCTSIZE + (y >> 1) * 8 + (x >> 1)] = (signed char)((iCr[0] + iCr[1] + iCr[2] + iCr[3]) >> 14);
+                pMCUData[4 * JPEGE_DCT_SIZE + (y >> 1) * 8 + (x >> 1)] = (signed char)((iCb[0] + iCb[1] + iCb[2] + iCb[3]) >> 14);
+                pMCUData[5 * JPEGE_DCT_SIZE + (y >> 1) * 8 + (x >> 1)] = (signed char)((iCr[0] + iCr[1] + iCr[2] + iCr[3]) >> 14);
             }
         }
     }
@@ -1888,7 +1888,7 @@ static void JPEGLoadYUV420Luma(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, const ui
 
             if (source_x >= pJPEG->iWidth)
                 source_x = pJPEG->iWidth - 1;
-            pMCUData[block * DCTSIZE + offset] =
+            pMCUData[block * JPEGE_DCT_SIZE + offset] =
                 (signed char)(pY[source_y * iYPitch + source_x] - 128);
         }
     }
@@ -1915,9 +1915,9 @@ static void JPEGLoadYUV420P(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, const uint8
 
             if (source_x >= chroma_width)
                 source_x = chroma_width - 1;
-            pMCUData[4 * DCTSIZE + offset] =
+            pMCUData[4 * JPEGE_DCT_SIZE + offset] =
                 (signed char)(pCb[source_y * iCbPitch + source_x] - 128);
-            pMCUData[5 * DCTSIZE + offset] =
+            pMCUData[5 * JPEGE_DCT_SIZE + offset] =
                 (signed char)(pCr[source_y * iCrPitch + source_x] - 128);
         }
     }
@@ -1946,9 +1946,9 @@ static void JPEGLoadNV12(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, const uint8_t 
             if (source_x >= chroma_width)
                 source_x = chroma_width - 1;
             pUVPixel = &pUV[source_y * iUVPitch + source_x * 2];
-            pMCUData[4 * DCTSIZE + offset] =
+            pMCUData[4 * JPEGE_DCT_SIZE + offset] =
                 (signed char)(pUVPixel[0] - 128);
-            pMCUData[5 * DCTSIZE + offset] =
+            pMCUData[5 * JPEGE_DCT_SIZE + offset] =
                 (signed char)(pUVPixel[1] - 128);
         }
     }
@@ -2043,7 +2043,7 @@ void FlushCode(PIL_CODE *pPC)
    
     while (pPC->iLen > 0)
     {
-        c = (unsigned char) (pPC->ulAcc >> (REGISTER_WIDTH-8));
+        c = (unsigned char) (pPC->ulAcc >> (JPEGE_REGISTER_WIDTH-8));
         *pPC->pOut++ = c;
         if (c == 0xff) // stuffed 0
             *pPC->pOut++ = 0;
@@ -2078,35 +2078,35 @@ static int JPEGEncodeMCUData(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode)
         } // grayscale
     } else { // color
         if (pJPEG->ucSubSample == JPEGE_SUBSAMPLE_444) {
-            JPEGFDCT(&pJPEG->MCUc[0*DCTSIZE], pJPEG->MCUs);
+            JPEGFDCT(&pJPEG->MCUc[0*JPEGE_DCT_SIZE], pJPEG->MCUs);
             // Y
             bSparse = JPEGQuantize(pJPEG, pJPEG->MCUs, 0);
             pJPEG->iDCPred0 = JPEGEncodeMCU(0, pJPEG, pJPEG->MCUs, pJPEG->iDCPred0, bSparse);
-            JPEGFDCT(&pJPEG->MCUc[1*DCTSIZE], pJPEG->MCUs);
+            JPEGFDCT(&pJPEG->MCUc[1*JPEGE_DCT_SIZE], pJPEG->MCUs);
             // Cb
             bSparse = JPEGQuantize(pJPEG, pJPEG->MCUs, 1);
             pJPEG->iDCPred1 = JPEGEncodeMCU(1, pJPEG, pJPEG->MCUs, pJPEG->iDCPred1, bSparse);
-            JPEGFDCT(&pJPEG->MCUc[2*DCTSIZE], pJPEG->MCUs);
+            JPEGFDCT(&pJPEG->MCUc[2*JPEGE_DCT_SIZE], pJPEG->MCUs);
             // Cr
             bSparse = JPEGQuantize(pJPEG, pJPEG->MCUs, 1);
             pJPEG->iDCPred2 = JPEGEncodeMCU(1, pJPEG, pJPEG->MCUs, pJPEG->iDCPred2, bSparse);
         } else { // must be 420
-            JPEGFDCT(&pJPEG->MCUc[0*DCTSIZE], pJPEG->MCUs); // Y0
+            JPEGFDCT(&pJPEG->MCUc[0*JPEGE_DCT_SIZE], pJPEG->MCUs); // Y0
             bSparse = JPEGQuantize(pJPEG, pJPEG->MCUs, 0);
             pJPEG->iDCPred0 = JPEGEncodeMCU(0, pJPEG, pJPEG->MCUs, pJPEG->iDCPred0, bSparse);
-            JPEGFDCT(&pJPEG->MCUc[1*DCTSIZE], pJPEG->MCUs); // Y1
+            JPEGFDCT(&pJPEG->MCUc[1*JPEGE_DCT_SIZE], pJPEG->MCUs); // Y1
             bSparse = JPEGQuantize(pJPEG, pJPEG->MCUs, 0);
             pJPEG->iDCPred0 = JPEGEncodeMCU(0, pJPEG, pJPEG->MCUs, pJPEG->iDCPred0, bSparse);
-            JPEGFDCT(&pJPEG->MCUc[2*DCTSIZE], pJPEG->MCUs); // Y2
+            JPEGFDCT(&pJPEG->MCUc[2*JPEGE_DCT_SIZE], pJPEG->MCUs); // Y2
             bSparse = JPEGQuantize(pJPEG, pJPEG->MCUs, 0);
             pJPEG->iDCPred0 = JPEGEncodeMCU(0, pJPEG, pJPEG->MCUs, pJPEG->iDCPred0, bSparse);
-            JPEGFDCT(&pJPEG->MCUc[3*DCTSIZE], pJPEG->MCUs); // Y3
+            JPEGFDCT(&pJPEG->MCUc[3*JPEGE_DCT_SIZE], pJPEG->MCUs); // Y3
             bSparse = JPEGQuantize(pJPEG, pJPEG->MCUs, 0);
             pJPEG->iDCPred0 = JPEGEncodeMCU(0, pJPEG, pJPEG->MCUs, pJPEG->iDCPred0, bSparse);
-            JPEGFDCT(&pJPEG->MCUc[4*DCTSIZE], pJPEG->MCUs); // Cb
+            JPEGFDCT(&pJPEG->MCUc[4*JPEGE_DCT_SIZE], pJPEG->MCUs); // Cb
             bSparse = JPEGQuantize(pJPEG, pJPEG->MCUs, 1);
             pJPEG->iDCPred1 = JPEGEncodeMCU(1, pJPEG, pJPEG->MCUs, pJPEG->iDCPred1, bSparse);
-            JPEGFDCT(&pJPEG->MCUc[5*DCTSIZE], pJPEG->MCUs); // Cr
+            JPEGFDCT(&pJPEG->MCUc[5*JPEGE_DCT_SIZE], pJPEG->MCUs); // Cr
             bSparse = JPEGQuantize(pJPEG, pJPEG->MCUs, 1);
             pJPEG->iDCPred2 = JPEGEncodeMCU(1, pJPEG, pJPEG->MCUs, pJPEG->iDCPred2, bSparse);
         } // 420 subsample
