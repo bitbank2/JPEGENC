@@ -92,8 +92,8 @@ enum {
 enum {
     // 8-bit grayscale
     JPEGE_PIXEL_GRAYSCALE = 0,
-    // packed RGB565, expanded to 8-bit channels and converted to YCbCr
-    JPEGE_PIXEL_RGB565,
+    // little-endian packed RGB565, expanded to 8-bit channels and converted to YCbCr
+    JPEGE_PIXEL_RGB565_LE,
     // packed BGR888, converted to YCbCr
     JPEGE_PIXEL_RGB888,
     // packed RGBX8888, converted to YCbCr; the fourth byte is ignored
@@ -104,6 +104,8 @@ enum {
     JPEGE_PIXEL_YUV420P,
     // semi-planar YCbCr 4:2:0 (Y plane, interleaved CbCr plane)
     JPEGE_PIXEL_NV12,
+    // big-endian packed RGB565, expanded to 8-bit channels and converted to YCbCr
+    JPEGE_PIXEL_RGB565_BE,
     JPEGE_PIXEL_COUNT
 };
 // Compression quality

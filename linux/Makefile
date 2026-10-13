@@ -13,6 +13,9 @@ c_api_test: c_api_test.o jpegenc_core.o
 edge_mcu_test: edge_mcu_test.o jpegenc_core_asan.o
 	$(CC) $(ASAN_FLAGS) edge_mcu_test.o jpegenc_core_asan.o $(LIBS) -o edge_mcu_test
 
+rgb565_endian_test: rgb565_endian_test.o jpegenc_core_asan.o
+	$(CC) $(ASAN_FLAGS) rgb565_endian_test.o jpegenc_core_asan.o $(LIBS) -o rgb565_endian_test
+
 yuv420p_test: yuv420p_test.o jpegenc_core_asan.o
 	$(CC) $(ASAN_FLAGS) yuv420p_test.o jpegenc_core_asan.o $(LIBS) -o yuv420p_test
 
@@ -27,6 +30,9 @@ c_api_test.o: c_api_test.c
 
 edge_mcu_test.o: edge_mcu_test.c
 	$(CC) $(CFLAGS) $(ASAN_FLAGS) -c edge_mcu_test.c
+
+rgb565_endian_test.o: rgb565_endian_test.c
+	$(CC) $(CFLAGS) $(ASAN_FLAGS) -c rgb565_endian_test.c
 
 yuv420p_test.o: yuv420p_test.c
 	$(CC) $(CFLAGS) $(ASAN_FLAGS) -c yuv420p_test.c
@@ -43,13 +49,14 @@ jpegenc_core.o: ../src/jpegenc.c ../src/jpegenc.inl ../src/JPEGENC.h
 jpegenc_core_asan.o: ../src/jpegenc.c ../src/jpegenc.inl ../src/JPEGENC.h
 	$(CC) $(CFLAGS) $(ASAN_FLAGS) -c ../src/jpegenc.c -o jpegenc_core_asan.o
 
-test: jpegenc c_api_test edge_mcu_test yuv420p_test nv12_test
+test: jpegenc c_api_test edge_mcu_test rgb565_endian_test yuv420p_test nv12_test
 	./c_api_test
 	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 ./edge_mcu_test
+	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 ./rgb565_endian_test
 	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 ./yuv420p_test
 	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 ./nv12_test
 	./jpegenc cxx_api_test.jpg
 	test -s cxx_api_test.jpg
 
 clean:
-	rm -rf *.o jpegenc c_api_test edge_mcu_test yuv420p_test nv12_test cxx_api_test.jpg
+	rm -rf *.o jpegenc c_api_test edge_mcu_test rgb565_endian_test yuv420p_test nv12_test cxx_api_test.jpg

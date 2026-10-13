@@ -57,7 +57,7 @@ int ProcessBMP(const uint8_t *pBMP, int iSize)
     // Display and compress the BMP image at the same time
     lcd.setAddrWindow(xoff, yoff, w, h);
     rc = jpg.open(pOutput, iOutputSize);
-    rc = jpg.encodeBegin(&jpe, w, h, JPEGE_PIXEL_RGB565, JPEGE_SUBSAMPLE_420, JPEGE_Q_HIGH);
+    rc = jpg.encodeBegin(&jpe, w, h, JPEGE_PIXEL_RGB565_LE, JPEGE_SUBSAMPLE_420, JPEGE_Q_HIGH);
     if (rc == JPEGE_SUCCESS) {
         for (y=0; y<h; y+=16) { // MCUs are 16 lines tall for 4:2:0 subsampling
             for (k=0; k<16; k++) {
