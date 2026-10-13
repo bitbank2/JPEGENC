@@ -59,30 +59,30 @@ static int run_edge_test(const EDGE_TEST *test)
     for (i = 0; i < input_size; i++)
         pixels[i] = (uint8_t)((i * 37) ^ (i << 5));
 
-    rc = JPEGOpenRAM(&jpeg, output, OUTPUT_SIZE);
+    rc = JPEGENC_OpenRAM(&jpeg, output, OUTPUT_SIZE);
     if (rc != JPEGE_SUCCESS) {
-        fprintf(stderr, "%s: JPEGOpenRAM failed: %d\n", test->name, rc);
+        fprintf(stderr, "%s: JPEGENC_OpenRAM failed: %d\n", test->name, rc);
         goto out;
     }
 
-    rc = JPEGEncodeBegin(&jpeg, &encode, test->width, test->height,
+    rc = JPEGENC_EncodeBegin(&jpeg, &encode, test->width, test->height,
                          test->pixel_type, test->subsample, JPEGE_Q_BEST);
     if (rc != JPEGE_SUCCESS) {
-        fprintf(stderr, "%s: JPEGEncodeBegin failed: %d\n", test->name, rc);
+        fprintf(stderr, "%s: JPEGENC_EncodeBegin failed: %d\n", test->name, rc);
         goto out;
     }
 
-    rc = JPEGAddFrame(&jpeg, &encode, pixels,
+    rc = JPEGENC_AddFrame(&jpeg, &encode, pixels,
                       test->width * test->bytes_per_pixel);
     if (rc != JPEGE_SUCCESS) {
-        fprintf(stderr, "%s: JPEGAddFrame failed: %d\n", test->name, rc);
+        fprintf(stderr, "%s: JPEGENC_AddFrame failed: %d\n", test->name, rc);
         goto out;
     }
 
-    size = JPEGClose(&jpeg);
+    size = JPEGENC_Close(&jpeg);
     if (size < 4) {
-        fprintf(stderr, "%s: JPEGClose failed: %d\n", test->name,
-                JPEGGetLastError(&jpeg));
+        fprintf(stderr, "%s: JPEGENC_Close failed: %d\n", test->name,
+                JPEGENC_GetLastError(&jpeg));
         goto out;
     }
 

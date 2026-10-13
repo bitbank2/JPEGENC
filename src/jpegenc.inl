@@ -841,7 +841,7 @@ static void JPEGMakeHuffE(JPEGE_IMAGE *pJPEG)
 //
 // Finish the file
 //
-int JPEGEncodeEnd(JPEGE_IMAGE *pJPEG)
+int JPEGENC_EncodeEnd(JPEGE_IMAGE *pJPEG)
 {
     if (pJPEG->iError == JPEGE_SUCCESS)
     {
@@ -862,11 +862,11 @@ int JPEGEncodeEnd(JPEGE_IMAGE *pJPEG)
         return pJPEG->iDataSize; // return the size of the compressed data
     }
     return 0; // something went wrong
-} /* JPEGEncodeEnd() */
+} /* JPEGENC_EncodeEnd() */
 //
 // Initialize the encoder
 //
-int JPEGEncodeBegin(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, int iWidth, int iHeight, uint8_t ucPixelType, uint8_t ucSubSample, uint8_t ucQFactor)
+int JPEGENC_EncodeBegin(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, int iWidth, int iHeight, uint8_t ucPixelType, uint8_t ucSubSample, uint8_t ucQFactor)
 {
     uint8_t *pBuf;
     int i;
@@ -1133,7 +1133,7 @@ int JPEGEncodeBegin(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, int iWidth, int iHe
     JPEGMakeHuffE(pJPEG); // create the Huffman tables to encode
     pJPEG->iError = JPEGE_SUCCESS;
     return JPEGE_SUCCESS;
-} /* JPEGEncodeBegin() */
+} /* JPEGENC_EncodeBegin() */
 
 static int JPEGQuantize(JPEGE_IMAGE *pJPEG, signed short *pMCUSrc, int iTable)
 {
@@ -2183,7 +2183,7 @@ static int JPEGEncodeMCUData(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode)
     return JPEGE_SUCCESS;
 } /* JPEGEncodeMCUData() */
 
-int JPEGAddMCU(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, uint8_t *pPixels, int iPitch)
+int JPEGENC_AddMCU(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, uint8_t *pPixels, int iPitch)
 {
     int mcu_width;
     int mcu_height;
@@ -2218,9 +2218,9 @@ int JPEGAddMCU(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, uint8_t *pPixels, int iP
     }
 
     return JPEGEncodeMCUData(pJPEG, pEncode);
-} /* JPEGAddMCU() */
+} /* JPEGENC_AddMCU() */
 
-int JPEGAddFrame(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, uint8_t *pPixels, int iPitch)
+int JPEGENC_AddFrame(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, uint8_t *pPixels, int iPitch)
 {
 int x, y;
 uint8_t *s;
@@ -2255,14 +2255,14 @@ int iBPMCU;
     for (y = 0; y < pJPEG->iMCUHeight && rc == JPEGE_SUCCESS; y++) {
         s = &pPixels[y * pEncode->cy * iPitch];
         for (x = 0; x<pJPEG->iMCUWidth && rc == JPEGE_SUCCESS; x++) {
-            rc = JPEGAddMCU(pJPEG, pEncode, s, iPitch);
+            rc = JPEGENC_AddMCU(pJPEG, pEncode, s, iPitch);
             s += iBPMCU;
         } // for x
     } // for y
     return rc;
-} /* JPEGAddFrame() */
+} /* JPEGENC_AddFrame() */
 
-int JPEGAddFrameYUV420P(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, const uint8_t *pY, int iYPitch, const uint8_t *pCb, int iCbPitch, const uint8_t *pCr, int iCrPitch)
+int JPEGENC_AddFrameYUV420P(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, const uint8_t *pY, int iYPitch, const uint8_t *pCb, int iCbPitch, const uint8_t *pCr, int iCrPitch)
 {
     int chroma_width;
     int rc = JPEGE_SUCCESS;
@@ -2288,9 +2288,9 @@ int JPEGAddFrameYUV420P(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, const uint8_t *
     }
 
     return rc;
-} /* JPEGAddFrameYUV420P() */
+} /* JPEGENC_AddFrameYUV420P() */
 
-int JPEGAddFrameNV12(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, const uint8_t *pY, int iYPitch, const uint8_t *pUV, int iUVPitch)
+int JPEGENC_AddFrameNV12(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, const uint8_t *pY, int iYPitch, const uint8_t *pUV, int iUVPitch)
 {
     int chroma_width;
     int rc = JPEGE_SUCCESS;
@@ -2313,5 +2313,5 @@ int JPEGAddFrameNV12(JPEGE_IMAGE *pJPEG, JPEGENCODE *pEncode, const uint8_t *pY,
     }
 
     return rc;
-} /* JPEGAddFrameNV12() */
+} /* JPEGENC_AddFrameNV12() */
 

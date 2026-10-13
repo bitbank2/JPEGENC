@@ -24,7 +24,7 @@
 //
 // File (SD/MMC) based initialization
 //
-int JPEGOpen(JPEGE_IMAGE *pJPEG, const char *szFilename, JPEGE_OPEN_CALLBACK *pfnOpen, JPEGE_CLOSE_CALLBACK *pfnClose, JPEGE_READ_CALLBACK *pfnRead, JPEGE_WRITE_CALLBACK *pfnWrite, JPEGE_SEEK_CALLBACK *pfnSeek)
+int JPEGENC_Open(JPEGE_IMAGE *pJPEG, const char *szFilename, JPEGE_OPEN_CALLBACK *pfnOpen, JPEGE_CLOSE_CALLBACK *pfnClose, JPEGE_READ_CALLBACK *pfnRead, JPEGE_WRITE_CALLBACK *pfnWrite, JPEGE_SEEK_CALLBACK *pfnSeek)
 {
     if (pJPEG == NULL || szFilename == NULL || pfnOpen == NULL || pfnClose == NULL || pfnRead == NULL || pfnWrite == NULL || pfnSeek == NULL) {
         return JPEGE_INVALID_PARAMETER;
@@ -43,9 +43,9 @@ int JPEGOpen(JPEGE_IMAGE *pJPEG, const char *szFilename, JPEGE_OPEN_CALLBACK *pf
     }
     return JPEGE_SUCCESS;
 
-} /* JPEGOpen() */
+} /* JPEGENC_Open() */
 
-int JPEGOpenRAM(JPEGE_IMAGE *pJPEG, uint8_t *pOutput, int iBufferSize)
+int JPEGENC_OpenRAM(JPEGE_IMAGE *pJPEG, uint8_t *pOutput, int iBufferSize)
 {
     if (pJPEG == NULL || pOutput == NULL || iBufferSize < 1024) return JPEGE_INVALID_PARAMETER;
     memset(pJPEG, 0, sizeof(JPEGE_IMAGE));
@@ -54,28 +54,28 @@ int JPEGOpenRAM(JPEGE_IMAGE *pJPEG, uint8_t *pOutput, int iBufferSize)
     pJPEG->pHighWater = &pOutput[iBufferSize - 512];
 
     return JPEGE_SUCCESS;
-} /* JPEGOpenRAM() */
+} /* JPEGENC_OpenRAM() */
 
 //
 // return the last error (if any)
 //
-int JPEGGetLastError(JPEGE_IMAGE *pJPEG)
+int JPEGENC_GetLastError(JPEGE_IMAGE *pJPEG)
 {
     if (pJPEG == NULL) return JPEGE_INVALID_PARAMETER;
     return pJPEG->iError;
-} /* JPEGGetLastError() */
+} /* JPEGENC_GetLastError() */
 
 //
 // Close the file - not needed when encoding to memory
 //
-int JPEGClose(JPEGE_IMAGE *pJPEG)
+int JPEGENC_Close(JPEGE_IMAGE *pJPEG)
 {
     if (pJPEG == NULL) return JPEGE_INVALID_PARAMETER;
-    JPEGEncodeEnd(pJPEG);
+    JPEGENC_EncodeEnd(pJPEG);
     if (pJPEG->pfnClose)
         (*pJPEG->pfnClose)(&pJPEG->JPEGFile);
     return pJPEG->iDataSize;
-} /* JPEGClose() */
+} /* JPEGENC_Close() */
 
 // Include the C code which does the actual work
 #include "jpegenc.inl"

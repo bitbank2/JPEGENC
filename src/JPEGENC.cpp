@@ -28,12 +28,12 @@
 //
 int JPEGENC::open(const char *szFilename, JPEGE_OPEN_CALLBACK *pfnOpen, JPEGE_CLOSE_CALLBACK *pfnClose, JPEGE_READ_CALLBACK *pfnRead, JPEGE_WRITE_CALLBACK *pfnWrite, JPEGE_SEEK_CALLBACK *pfnSeek)
 {
-    return JPEGOpen(&_jpeg, szFilename, pfnOpen, pfnClose, pfnRead, pfnWrite, pfnSeek);
+    return JPEGENC_Open(&_jpeg, szFilename, pfnOpen, pfnClose, pfnRead, pfnWrite, pfnSeek);
 } /* open() */
 
 int JPEGENC::open(uint8_t *pOutput, int iBufferSize)
 {
-    return JPEGOpenRAM(&_jpeg, pOutput, iBufferSize);
+    return JPEGENC_OpenRAM(&_jpeg, pOutput, iBufferSize);
 } /* open() */
 
 //
@@ -41,38 +41,38 @@ int JPEGENC::open(uint8_t *pOutput, int iBufferSize)
 //
 int JPEGENC::getLastError()
 {
-    return JPEGGetLastError(&_jpeg);
+    return JPEGENC_GetLastError(&_jpeg);
 } /* getLastError() */
 //
 // Close the file - not needed when decoding from memory
 //
 int JPEGENC::close()
 {
-    return JPEGClose(&_jpeg);
+    return JPEGENC_Close(&_jpeg);
 } /* close() */
 
 int JPEGENC::encodeBegin(JPEGENCODE *pEncode, int iWidth, int iHeight, uint8_t ucPixelType, uint8_t ucSubSample, uint8_t ucQFactor)
 {
-    return JPEGEncodeBegin(&_jpeg, pEncode, iWidth, iHeight, ucPixelType, ucSubSample, ucQFactor);
+    return JPEGENC_EncodeBegin(&_jpeg, pEncode, iWidth, iHeight, ucPixelType, ucSubSample, ucQFactor);
 } /* encodeBegin() */
 
 int JPEGENC::addMCU(JPEGENCODE *pEncode, uint8_t *pPixels, int iPitch)
 {
-    return JPEGAddMCU(&_jpeg, pEncode, pPixels, iPitch);
+    return JPEGENC_AddMCU(&_jpeg, pEncode, pPixels, iPitch);
 } /* addMCU() */
 
 int JPEGENC::addFrame(JPEGENCODE *pEncode, uint8_t *pPixels, int iPitch)
 {
-    return JPEGAddFrame(&_jpeg, pEncode, pPixels, iPitch);
+    return JPEGENC_AddFrame(&_jpeg, pEncode, pPixels, iPitch);
 } /* addFrame() */
 
 int JPEGENC::addFrameYUV420P(JPEGENCODE *pEncode, const uint8_t *pY, int iYPitch, const uint8_t *pCb, int iCbPitch, const uint8_t *pCr, int iCrPitch)
 {
-    return JPEGAddFrameYUV420P(&_jpeg, pEncode, pY, iYPitch, pCb, iCbPitch, pCr, iCrPitch);
+    return JPEGENC_AddFrameYUV420P(&_jpeg, pEncode, pY, iYPitch, pCb, iCbPitch, pCr, iCrPitch);
 } /* addFrameYUV420P() */
 
 int JPEGENC::addFrameNV12(JPEGENCODE *pEncode, const uint8_t *pY, int iYPitch, const uint8_t *pUV, int iUVPitch)
 {
-    return JPEGAddFrameNV12(&_jpeg, pEncode, pY, iYPitch, pUV, iUVPitch);
+    return JPEGENC_AddFrameNV12(&_jpeg, pEncode, pY, iYPitch, pUV, iUVPitch);
 } /* addFrameNV12() */
 

@@ -24,29 +24,29 @@ int main(void)
         pixels[i] = (uint8_t)i;
     }
 
-    rc = JPEGOpenRAM(&jpeg, output, sizeof(output));
+    rc = JPEGENC_OpenRAM(&jpeg, output, sizeof(output));
     if (rc != JPEGE_SUCCESS) {
-        fprintf(stderr, "JPEGOpenRAM failed: %d\n", rc);
+        fprintf(stderr, "JPEGENC_OpenRAM failed: %d\n", rc);
         return 1;
     }
 
-    rc = JPEGEncodeBegin(&jpeg, &encode, IMAGE_WIDTH, IMAGE_HEIGHT,
+    rc = JPEGENC_EncodeBegin(&jpeg, &encode, IMAGE_WIDTH, IMAGE_HEIGHT,
                          JPEGE_PIXEL_GRAYSCALE, JPEGE_SUBSAMPLE_444,
                          JPEGE_Q_BEST);
     if (rc != JPEGE_SUCCESS) {
-        fprintf(stderr, "JPEGEncodeBegin failed: %d\n", rc);
+        fprintf(stderr, "JPEGENC_EncodeBegin failed: %d\n", rc);
         return 1;
     }
 
-    rc = JPEGAddFrame(&jpeg, &encode, pixels, IMAGE_WIDTH);
+    rc = JPEGENC_AddFrame(&jpeg, &encode, pixels, IMAGE_WIDTH);
     if (rc != JPEGE_SUCCESS) {
-        fprintf(stderr, "JPEGAddFrame failed: %d\n", rc);
+        fprintf(stderr, "JPEGENC_AddFrame failed: %d\n", rc);
         return 1;
     }
 
-    size = JPEGClose(&jpeg);
+    size = JPEGENC_Close(&jpeg);
     if (size < 4) {
-        fprintf(stderr, "JPEGClose failed: %d\n", JPEGGetLastError(&jpeg));
+        fprintf(stderr, "JPEGENC_Close failed: %d\n", JPEGENC_GetLastError(&jpeg));
         return 1;
     }
 

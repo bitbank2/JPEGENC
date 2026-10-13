@@ -32,21 +32,21 @@ static int encode_yuv422(const uint8_t *pixels, int width, int height,
     JPEGENCODE encode;
     int rc;
 
-    rc = JPEGOpenRAM(&jpeg, output, OUTPUT_SIZE);
+    rc = JPEGENC_OpenRAM(&jpeg, output, OUTPUT_SIZE);
     if (rc == JPEGE_SUCCESS) {
-        rc = JPEGEncodeBegin(&jpeg, &encode, width, height,
+        rc = JPEGENC_EncodeBegin(&jpeg, &encode, width, height,
                              JPEGE_PIXEL_YUV422, JPEGE_SUBSAMPLE_420,
                              JPEGE_Q_BEST);
     }
     if (rc == JPEGE_SUCCESS) {
-        rc = JPEGAddFrame(&jpeg, &encode, (uint8_t *)pixels, width * 2);
+        rc = JPEGENC_AddFrame(&jpeg, &encode, (uint8_t *)pixels, width * 2);
     }
     if (rc != JPEGE_SUCCESS) {
         fprintf(stderr, "YUV422 encode failed: %d\n", rc);
         return -1;
     }
 
-    *output_size = JPEGClose(&jpeg);
+    *output_size = JPEGENC_Close(&jpeg);
     return *output_size > 0 ? 0 : -1;
 }
 
@@ -60,14 +60,14 @@ static int encode_yuv420p(const uint8_t *y, int y_pitch,
     JPEGENCODE encode;
     int rc;
 
-    rc = JPEGOpenRAM(&jpeg, output, OUTPUT_SIZE);
+    rc = JPEGENC_OpenRAM(&jpeg, output, OUTPUT_SIZE);
     if (rc == JPEGE_SUCCESS) {
-        rc = JPEGEncodeBegin(&jpeg, &encode, width, height,
+        rc = JPEGENC_EncodeBegin(&jpeg, &encode, width, height,
                              JPEGE_PIXEL_YUV420P, JPEGE_SUBSAMPLE_420,
                              JPEGE_Q_BEST);
     }
     if (rc == JPEGE_SUCCESS) {
-        rc = JPEGAddFrameYUV420P(&jpeg, &encode, y, y_pitch, cb, cb_pitch,
+        rc = JPEGENC_AddFrameYUV420P(&jpeg, &encode, y, y_pitch, cb, cb_pitch,
                                 cr, cr_pitch);
     }
     if (rc != JPEGE_SUCCESS) {
@@ -75,7 +75,7 @@ static int encode_yuv420p(const uint8_t *y, int y_pitch,
         return -1;
     }
 
-    *output_size = JPEGClose(&jpeg);
+    *output_size = JPEGENC_Close(&jpeg);
     return *output_size > 0 ? 0 : -1;
 }
 
